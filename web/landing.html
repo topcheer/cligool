@@ -991,6 +991,92 @@
         }
 
         /* ===================================
+           Platform Tabs - Modern Tab Interface
+           =================================== */
+        .platform-tabs {
+            display: flex;
+            gap: var(--spacing-2);
+            margin-bottom: var(--spacing-12);
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .platform-tab {
+            padding: var(--spacing-4) var(--spacing-8);
+            background: white;
+            border: 2px solid var(--color-gray-200);
+            border-radius: var(--radius-xl);
+            font-size: var(--text-base);
+            font-weight: 700;
+            cursor: pointer;
+            transition: all var(--transition-smooth);
+            color: var(--color-gray-600);
+            position: relative;
+            overflow: hidden;
+            transform: translateZ(0);
+            will-change: transform, border-color;
+        }
+
+        .platform-tab:hover {
+            border-color: var(--color-primary-300);
+            color: var(--color-primary-600);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .platform-tab.active {
+            background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-700));
+            color: white;
+            border-color: transparent;
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+
+        .platform-tab::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, var(--color-accent-500), var(--color-primary-500));
+            opacity: 0;
+            transition: opacity var(--transition-smooth);
+        }
+
+        .platform-tab:hover::before {
+            opacity: 0.1;
+        }
+
+        .platform-panel {
+            display: none;
+            animation: fadeInUp 0.5s ease-out;
+        }
+
+        .platform-panel.active {
+            display: block;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 640px) {
+            .platform-tabs {
+                gap: var(--spacing-1);
+            }
+
+            .platform-tab {
+                padding: var(--spacing-3) var(--spacing-5);
+                font-size: var(--text-sm);
+            }
+        }
+
+        /* ===================================
            Usage Section - Enhanced with Advanced Animations
            =================================== */
         .usage-section {
@@ -1623,114 +1709,341 @@
     <section class="downloads-section" id="downloads" aria-labelledby="downloads-title">
         <div class="section-header">
             <h2 id="downloads-title">📥 选择你的平台</h2>
-            <p>CliGool 支持6个主流平台架构，自动识别你的系统版本</p>
+            <p>CliGool 支持18个主流平台架构，覆盖所有*nix系统和Windows</p>
         </div>
 
-        <div class="downloads-grid">
-            <!-- Windows x64 -->
-            <article class="download-card" tabindex="0">
-                <span class="platform-icon" role="img" aria-label="Windows平台">🪟</span>
-                <h3 class="download-title">
-                    Windows
-                    <span class="badge badge-popular">热门</span>
-                </h3>
-                <div class="download-info">
-                    Windows 10/11 (64位)<br>
-                    Intel/AMD 处理器
-                </div>
-                <a href="/downloads/cligool-windows-amd64.zip?v=202603061939"
-                   class="download-button"
-                   download
-                   aria-label="下载 Windows x64 版本">
-                    <span>⬇️ 下载 Windows x64</span>
-                </a>
-            </article>
+        <!-- Platform Tabs -->
+        <div class="platform-tabs" role="tablist">
+            <button class="platform-tab active"
+                    data-tab="windows"
+                    role="tab"
+                    aria-selected="true"
+                    aria-controls="windows-panel">
+                🪟 Windows
+            </button>
+            <button class="platform-tab"
+                    data-tab="linux"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="linux-panel">
+                🐧 Linux
+            </button>
+            <button class="platform-tab"
+                    data-tab="bsd"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="bsd-panel">
+                🐡 *BSD
+            </button>
+            <button class="platform-tab"
+                    data-tab="macos"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="macos-panel">
+                🍎 macOS
+            </button>
+        </div>
 
-            <!-- Windows ARM64 -->
-            <article class="download-card" tabindex="0">
-                <span class="platform-icon" role="img" aria-label="Windows ARM平台">🪟</span>
-                <h3 class="download-title">Windows ARM</h3>
-                <div class="download-info">
-                    Windows 10/11 ARM<br>
-                    Surface Pro X 等设备
-                </div>
-                <a href="/downloads/cligool-windows-arm64.zip?v=202603061939"
-                   class="download-button"
-                   download
-                   aria-label="下载 Windows ARM 版本">
-                    <span>⬇️ 下载 Windows ARM</span>
-                </a>
-            </article>
+        <!-- Windows Panel -->
+        <div class="platform-panel active" id="windows-panel" role="tabpanel">
+            <div class="downloads-grid">
+                <article class="download-card" tabindex="0">
+                    <span class="platform-icon" role="img" aria-label="Windows x64平台">🪟</span>
+                    <h3 class="download-title">
+                        Windows x64
+                        <span class="badge badge-popular">热门</span>
+                    </h3>
+                    <div class="download-info">
+                        Windows 10/11 (64位)<br>
+                        Intel/AMD 处理器
+                    </div>
+                    <a href="/downloads/cligool-windows-amd64.zip?v=202603062018"
+                       class="download-button"
+                       download
+                       aria-label="下载 Windows x64 版本">
+                        <span>⬇️ 下载 Windows x64</span>
+                    </a>
+                </article>
 
-            <!-- Linux x64 -->
-            <article class="download-card" tabindex="0">
-                <span class="platform-icon" role="img" aria-label="Linux平台">🐧</span>
-                <h3 class="download-title">Linux x64</h3>
-                <div class="download-info">
-                    Ubuntu、Debian、CentOS<br>
-                    64位服务器/桌面
-                </div>
-                <a href="/downloads/cligool-linux-amd64?v=202603061939"
-                   class="download-button"
-                   download
-                   aria-label="下载 Linux x64 版本">
-                    <span>⬇️ 下载 Linux x64</span>
-                </a>
-            </article>
+                <article class="download-card" tabindex="0">
+                    <span class="platform-icon" role="img" aria-label="Windows ARM平台">🪟</span>
+                    <h3 class="download-title">Windows ARM64</h3>
+                    <div class="download-info">
+                        Windows 10/11 ARM<br>
+                        Surface Pro X 等设备
+                    </div>
+                    <a href="/downloads/cligool-windows-arm64.zip?v=202603062018"
+                       class="download-button"
+                       download
+                       aria-label="下载 Windows ARM 版本">
+                        <span>⬇️ 下载 Windows ARM</span>
+                    </a>
+                </article>
+            </div>
+        </div>
 
-            <!-- Linux ARM64 -->
-            <article class="download-card" tabindex="0">
-                <span class="platform-icon" role="img" aria-label="Linux ARM平台">🐧</span>
-                <h3 class="download-title">
-                    Linux ARM
-                    <span class="badge badge-new">新</span>
-                </h3>
-                <div class="download-info">
-                    树莓派 4/5、ARM服务器<br>
-                    64位ARM系统
-                </div>
-                <a href="/downloads/cligool-linux-arm64?v=202603061939"
-                   class="download-button"
-                   download
-                   aria-label="下载 Linux ARM 版本">
-                    <span>⬇️ 下载 Linux ARM</span>
-                </a>
-            </article>
+        <!-- Linux Panel -->
+        <div class="platform-panel" id="linux-panel" role="tabpanel">
+            <div class="downloads-grid">
+                <article class="download-card" tabindex="0">
+                    <span class="platform-icon" role="img" aria-label="Linux x64平台">🐧</span>
+                    <h3 class="download-title">
+                        Linux x64
+                        <span class="badge badge-popular">热门</span>
+                    </h3>
+                    <div class="download-info">
+                        Ubuntu、Debian、CentOS<br>
+                        64位服务器/桌面
+                    </div>
+                    <a href="/downloads/cligool-linux-amd64?v=202603062018"
+                       class="download-button"
+                       download
+                       aria-label="下载 Linux x64 版本">
+                        <span>⬇️ 下载 Linux x64</span>
+                    </a>
+                </article>
 
-            <!-- macOS Intel -->
-            <article class="download-card" tabindex="0">
-                <span class="platform-icon" role="img" aria-label="macOS平台">🍎</span>
-                <h3 class="download-title">macOS Intel</h3>
-                <div class="download-info">
-                    macOS 10.15+<br>
-                    Intel 处理器
-                </div>
-                <a href="/downloads/cligool-darwin-amd64?v=202603061939"
-                   class="download-button"
-                   download
-                   aria-label="下载 macOS Intel 版本">
-                    <span>⬇️ 下载 macOS Intel</span>
-                </a>
-            </article>
+                <article class="download-card" tabindex="0">
+                    <span class="platform-icon" role="img" aria-label="Linux ARM64平台">🐧</span>
+                    <h3 class="download-title">Linux ARM64</h3>
+                    <div class="download-info">
+                        树莓派 4/5、ARM服务器<br>
+                        64位ARM系统
+                    </div>
+                    <a href="/downloads/cligool-linux-arm64?v=202603062018"
+                       class="download-button"
+                       download
+                       aria-label="下载 Linux ARM 版本">
+                        <span>⬇️ 下载 Linux ARM</span>
+                    </a>
+                </article>
 
-            <!-- macOS ARM64 -->
-            <article class="download-card" tabindex="0">
-                <span class="platform-icon" role="img" aria-label="macOS ARM平台">🍎</span>
-                <h3 class="download-title">
-                    macOS ARM
-                    <span class="badge badge-hot">M系列</span>
-                </h3>
-                <div class="download-info">
-                    macOS 11.0+<br>
-                    Apple Silicon (M1/M2/M3)
-                </div>
-                <a href="/downloads/cligool-darwin-arm64?v=202603061939"
-                   class="download-button"
-                   download
-                   aria-label="下载 macOS ARM 版本">
-                    <span>⬇️ 下载 macOS ARM</span>
-                </a>
-            </article>
+                <article class="download-card" tabindex="0">
+                    <span class="platform-icon" role="img" aria-label="Linux 386平台">🐧</span>
+                    <h3 class="download-title">Linux 386</h3>
+                    <div class="download-info">
+                        32位x86系统<br>
+                        老旧设备兼容
+                    </div>
+                    <a href="/downloads/cligool-linux-386?v=202603062018"
+                       class="download-button"
+                       download
+                       aria-label="下载 Linux 386 版本">
+                        <span>⬇️ 下载 Linux 386</span>
+                    </a>
+                </article>
+
+                <article class="download-card" tabindex="0">
+                    <span class="platform-icon" role="img" aria-label="Linux ARM平台">🐧</span>
+                    <h3 class="download-title">Linux ARM</h3>
+                    <div class="download-info">
+                        树莓派等ARM设备<br>
+                        32位ARM系统
+                    </div>
+                    <a href="/downloads/cligool-linux-arm?v=202603062018"
+                       class="download-button"
+                       download
+                       aria-label="下载 Linux ARM 32位版本">
+                        <span>⬇️ 下载 Linux ARM</span>
+                    </a>
+                </article>
+
+                <article class="download-card" tabindex="0">
+                    <span class="platform-icon" role="img" aria-label="Linux RISC-V平台">🐧</span>
+                    <h3 class="download-title">
+                        Linux RISC-V
+                        <span class="badge badge-new">新</span>
+                    </h3>
+                    <div class="download-info">
+                        RISC-V架构<br>
+                        开源硬件平台
+                    </div>
+                    <a href="/downloads/cligool-linux-riscv64?v=202603062018"
+                       class="download-button"
+                       download
+                       aria-label="下载 Linux RISC-V 版本">
+                        <span>⬇️ 下载 RISC-V</span>
+                    </a>
+                </article>
+
+                <article class="download-card" tabindex="0">
+                    <span class="platform-icon" role="img" aria-label="Linux PowerPC平台">🐧</span>
+                    <h3 class="download-title">Linux PowerPC</h3>
+                    <div class="download-info">
+                        ppc64le架构<br>
+                        POWER系统
+                    </div>
+                    <a href="/downloads/cligool-linux-ppc64le?v=202603062018"
+                       class="download-button"
+                       download
+                       aria-label="下载 Linux PowerPC 版本">
+                        <span>⬇️ 下载 PowerPC</span>
+                    </a>
+                </article>
+
+                <article class="download-card" tabindex="0">
+                    <span class="platform-icon" role="img" aria-label="Linux s390x平台">🐧</span>
+                    <h3 class="download-title">Linux s390x</h3>
+                    <div class="download-info">
+                        IBM System z<br>
+                        大型主机系统
+                    </div>
+                    <a href="/downloads/cligool-linux-s390x?v=202603062018"
+                       class="download-button"
+                       download
+                       aria-label="下载 Linux s390x 版本">
+                        <span>⬇️ 下载 s390x</span>
+                    </a>
+                </article>
+
+                <article class="download-card" tabindex="0">
+                    <span class="platform-icon" role="img" aria-label="Linux MIPS平台">🐧</span>
+                    <h3 class="download-title">Linux MIPS</h3>
+                    <div class="download-info">
+                        MIPS64架构<br>
+                        嵌入式系统
+                    </div>
+                    <a href="/downloads/cligool-linux-mips64le?v=202603062018"
+                       class="download-button"
+                       download
+                       aria-label="下载 Linux MIPS 版本">
+                        <span>⬇️ 下载 MIPS</span>
+                    </a>
+                </article>
+            </div>
+        </div>
+
+        <!-- BSD Panel -->
+        <div class="platform-panel" id="bsd-panel" role="tabpanel">
+            <div class="downloads-grid">
+                <article class="download-card" tabindex="0">
+                    <span class="platform-icon" role="img" aria-label="FreeBSD平台">🐡</span>
+                    <h3 class="download-title">FreeBSD amd64</h3>
+                    <div class="download-info">
+                        FreeBSD 11+<br>
+                        64位系统
+                    </div>
+                    <a href="/downloads/cligool-freebsd-amd64?v=202603062018"
+                       class="download-button"
+                       download
+                       aria-label="下载 FreeBSD amd64 版本">
+                        <span>⬇️ 下载 FreeBSD</span>
+                    </a>
+                </article>
+
+                <article class="download-card" tabindex="0">
+                    <span class="platform-icon" role="img" aria-label="FreeBSD ARM平台">🐡</span>
+                    <h3 class="download-title">FreeBSD ARM64</h3>
+                    <div class="download-info">
+                        FreeBSD ARM<br>
+                        64位ARM系统
+                    </div>
+                    <a href="/downloads/cligool-freebsd-arm64?v=202603062018"
+                       class="download-button"
+                       download
+                       aria-label="下载 FreeBSD ARM 版本">
+                        <span>⬇️ 下载 FreeBSD ARM</span>
+                    </a>
+                </article>
+
+                <article class="download-card" tabindex="0">
+                    <span class="platform-icon" role="img" aria-label="OpenBSD平台">🐡</span>
+                    <h3 class="download-title">OpenBSD amd64</h3>
+                    <div class="download-info">
+                        OpenBSD 6.6+<br>
+                        64位系统
+                    </div>
+                    <a href="/downloads/cligool-openbsd-amd64?v=202603062018"
+                       class="download-button"
+                       download
+                       aria-label="下载 OpenBSD 版本">
+                        <span>⬇️ 下载 OpenBSD</span>
+                    </a>
+                </article>
+
+                <article class="download-card" tabindex="0">
+                    <span class="platform-icon" role="img" aria-label="OpenBSD ARM平台">🐡</span>
+                    <h3 class="download-title">OpenBSD ARM64</h3>
+                    <div class="download-info">
+                        OpenBSD ARM<br>
+                        64位ARM系统
+                    </div>
+                    <a href="/downloads/cligool-openbsd-arm64?v=202603062018"
+                       class="download-button"
+                       download
+                       aria-label="下载 OpenBSD ARM 版本">
+                        <span>⬇️ 下载 OpenBSD ARM</span>
+                    </a>
+                </article>
+
+                <article class="download-card" tabindex="0">
+                    <span class="platform-icon" role="img" aria-label="NetBSD平台">🐡</span>
+                    <h3 class="download-title">NetBSD amd64</h3>
+                    <div class="download-info">
+                        NetBSD 8+<br>
+                        64位系统
+                    </div>
+                    <a href="/downloads/cligool-netbsd-amd64?v=202603062018"
+                       class="download-button"
+                       download
+                       aria-label="下载 NetBSD 版本">
+                        <span>⬇️ 下载 NetBSD</span>
+                    </a>
+                </article>
+
+                <article class="download-card" tabindex="0">
+                    <span class="platform-icon" role="img" aria-label="DragonFlyBSD平台">🐡</span>
+                    <h3 class="download-title">DragonFlyBSD</h3>
+                    <div class="download-info">
+                        DragonFly BSD<br>
+                        64位系统
+                    </div>
+                    <a href="/downloads/cligool-dragonfly-amd64?v=202603062018"
+                       class="download-button"
+                       download
+                       aria-label="下载 DragonFlyBSD 版本">
+                        <span>⬇️ 下载 DragonFlyBSD</span>
+                    </a>
+                </article>
+            </div>
+        </div>
+
+        <!-- macOS Panel -->
+        <div class="platform-panel" id="macos-panel" role="tabpanel">
+            <div class="downloads-grid">
+                <article class="download-card" tabindex="0">
+                    <span class="platform-icon" role="img" aria-label="macOS Intel平台">🍎</span>
+                    <h3 class="download-title">macOS Intel</h3>
+                    <div class="download-info">
+                        macOS 10.15+<br>
+                        Intel 处理器
+                    </div>
+                    <a href="/downloads/cligool-darwin-amd64?v=202603062018"
+                       class="download-button"
+                       download
+                       aria-label="下载 macOS Intel 版本">
+                        <span>⬇️ 下载 macOS Intel</span>
+                    </a>
+                </article>
+
+                <article class="download-card" tabindex="0">
+                    <span class="platform-icon" role="img" aria-label="macOS ARM平台">🍎</span>
+                    <h3 class="download-title">
+                        macOS ARM
+                        <span class="badge badge-hot">M系列</span>
+                    </h3>
+                    <div class="download-info">
+                        macOS 11.0+<br>
+                        Apple Silicon (M1/M2/M3)
+                    </div>
+                    <a href="/downloads/cligool-darwin-arm64?v=202603062018"
+                       class="download-button"
+                       download
+                       aria-label="下载 macOS ARM 版本">
+                        <span>⬇️ 下载 macOS ARM</span>
+                    </a>
+                </article>
+            </div>
         </div>
     </section>
 
@@ -1990,6 +2303,36 @@
                 imageObserver.observe(img);
             });
         }
+
+        // Platform Tabs functionality
+        const platformTabs = document.querySelectorAll('.platform-tab');
+        const platformPanels = document.querySelectorAll('.platform-panel');
+
+        platformTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetTab = tab.getAttribute('data-tab');
+
+                // Remove active class from all tabs and panels
+                platformTabs.forEach(t => t.classList.remove('active'));
+                platformPanels.forEach(p => p.classList.remove('active'));
+
+                // Add active class to clicked tab
+                tab.classList.add('active');
+
+                // Show corresponding panel
+                const targetPanel = document.getElementById(`${targetTab}-panel`);
+                if (targetPanel) {
+                    targetPanel.classList.add('active');
+
+                    // Reinitialize animations for cards in the new panel
+                    const cards = targetPanel.querySelectorAll('.download-card');
+                    cards.forEach((card, index) => {
+                        card.style.animationDelay = `${index * 0.1}s`;
+                        card.classList.add('visible');
+                    });
+                }
+            });
+        });
 
         // Console easter egg
         console.log(
