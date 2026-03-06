@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CliGool - 远程终端</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: #2d2d2d;
+            padding: 15px 20px;
+            border-bottom: 1px solid #3e3e3e;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4ec9b0;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        button {
+            background: #4ec9b0;
+            color: #1e1e1e;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #3db8a0;
+        }
+
+        .disconnect-btn {
+            background: #f48771;
+            color: #1e1e1e;
+        }
+
+        .disconnect-btn:hover {
+            background: #e37660;
+        }
+
+        .status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status.disconnected {
+            background: #f48771;
+            color: #1e1e1e;
+        }
+
+        .status.connecting {
+            background: #dcdcaa;
+            color: #1e1e1e;
+        }
+
+        .status.connected {
+            background: #4ec9b0;
+            color: #1e1e1e;
+        }
+
+        .session-info {
+            color: #8a8a8a;
+            font-size: 12px;
+        }
+
+        .terminal-container {
+            flex: 1;
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        #terminal {
+            width: 100%;
+            height: 100%;
+            background: #1e1e1e;
+        }
+
+        .footer {
+            background: #2d2d2d;
+            padding: 10px 20px;
+            border-top: 1px solid #3e3e3e;
+            font-size: 12px;
+            color: #8a8a8a;
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">CliGool - 远程终端</div>
+        <div class="controls">
+            <span class="status disconnected" id="connection-status">未连接</span>
+            <span class="session-info" id="session-info">正在加载...</span>
+            <button id="disconnect-btn" class="disconnect-btn" style="display: none;">断开</button>
+        </div>
+    </div>
+
+    <div class="terminal-container">
+        <div id="terminal"></div>
+    </div>
+
+    <div class="footer">
+        <div class="shortcuts">
+            <div class="shortcut-item">
+                <kbd>Ctrl</kbd> + <kbd>C</kbd> 复制
+            </div>
+            <div class="shortcut-item">
+                <kbd>Ctrl</kbd> + <kbd>V</kbd> 粘贴
+            </div>
+        </div>
+        <div class="info">
+            CliGool 远程终端
+        </div>
+    </div>
+
+    <!-- 使用本地托管的xterm.js -->
+    <link rel="stylesheet" href="/lib/xterm.css">
+    <script src="/lib/xterm.js"></script>
+    <script src="/lib/xterm-addon-fit.js"></script>
+    <script src="/lib/xterm-addon-webgl.js"></script>
+
+    <script>
+        // 全局变量
+        let terminal = null;
+        let fitAddon = null;
+        let webglAddon = null;
+        let ws = null;
+
+        // 从URL获取会话ID
+        const pathParts = window.location.pathname.split('/');
+        const sessionId = pathParts[pathParts.length - 1];
+
+        // 构建服务器URL
+        const serverUrl = window.location.protocol === 'https:' ? 'wss://' + window.location.host : 'ws://' + window.location.host;
+
+        // 更新会话信息显示
+        document.getElementById('session-info').textContent = '会话: ' + sessionId;
+
+        // 页面加载完成后初始化
+        window.addEventListener('load', function() {
+            // 检查Terminal是否加载成功
+            if (typeof Terminal === 'undefined') {
+                document.getElementById('terminal').innerHTML = '<div style="color:white;padding:20px;"><h1>❌ 加载失败</h1><p>xterm.js库未能加载，请检查网络连接或刷新页面</p></div>';
+                return;
+            }
+
+            try {
+                // 初始化终端
+                initTerminal();
+
+                // 设置断开按钮事件
+                document.getElementById('disconnect-btn').addEventListener('click', disconnect);
+
+                // 自动连接WebSocket
+                setTimeout(connectWebSocket, 1000);
+
+            } catch (e) {
+                console.error('初始化失败:', e);
+                document.getElementById('terminal').innerHTML = '<div style="color:white;padding:20px;"><h1>❌ 初始化失败</h1><p>' + e.message + '</p></div>';
+            }
+        });
+
+        function initTerminal() {
+            terminal = new Terminal({
+                cursorBlink: true,
+                fontSize: 14,
+                fontFamily: 'Menlo, "Monaco", "Courier New", monospace',
+                theme: {
+                    background: '#1e1e1e',
+                    foreground: '#d4d4d4',
+                    cursor: '#4ec9b0',
+                    black: '#000000',
+                    red: '#cd3131',
+                    green: '#0dbc79',
+                    yellow: '#e5e510',
+                    blue: '#2472c8',
+                    magenta: '#bc3fbc',
+                    cyan: '#11a8cd',
+                    white: '#e5e5e5',
+                },
+                scrollback: 1000,
+                tabStopWidth: 4,
+            });
+
+            // 加载插件
+            fitAddon = new FitAddon.FitAddon();
+            terminal.loadAddon(fitAddon);
+
+            webglAddon = new WebglAddon.WebglAddon();
+            terminal.loadAddon(webglAddon);
+
+            // 挂载终端
+            terminal.open(document.getElementById('terminal'));
+            fitAddon.fit();
+
+            // 监听窗口大小变化
+            window.addEventListener('resize', () => {
+                fitAddon.fit();
+            });
+
+            // 欢迎信息
+            terminal.writeln('✨ 欢迎使用 CliGool 远程终端！');
+            terminal.writeln(`📋 会话ID: ${sessionId}`);
+            terminal.writeln(`🔧 正在连接到服务器...`);
+            terminal.writeln('');
+
+            // 终端输入处理
+            terminal.onData(data => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    // 使用更高效的发送方式
+                    ws.send(JSON.stringify({
+                        type: 'input',
+                        data: data,
+                        session: sessionId
+                    }));
+                }
+            });
+
+            // 终端大小变化处理
+            terminal.onResize(({ cols, rows }) => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'resize',
+                        cols: cols,
+                        rows: rows,
+                        session: sessionId
+                    }));
+                }
+            });
+        }
+
+        function connectWebSocket() {
+            updateConnectionStatus('connecting');
+
+            // 构建WebSocket URL
+            const wsUrl = `${serverUrl}/api/terminal/${sessionId}?type=web&user_id=web-${Date.now()}`;
+
+            terminal.writeln(`🔧 WebSocket连接: ${wsUrl}`);
+            terminal.writeln('');
+
+            try {
+                ws = new WebSocket(wsUrl);
+
+                ws.onopen = () => {
+                    terminal.writeln('✅ WebSocket连接已建立');
+                    updateConnectionStatus('connected');
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const msg = JSON.parse(event.data);
+                        handleTerminalMessage(msg);
+                    } catch (e) {
+                        terminal.writeln(`❌ 解析消息失败: ${e.message}`);
+                        console.error('解析消息失败:', e, event.data);
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    terminal.writeln(`❌ WebSocket错误`);
+                    console.error('WebSocket错误:', error);
+                    updateConnectionStatus('disconnected');
+                };
+
+                ws.onclose = (event) => {
+                    terminal.writeln(`❌ 连接已断开: code=${event.code}`);
+                    console.log('WebSocket关闭:', event);
+                    updateConnectionStatus('disconnected');
+                };
+
+            } catch (error) {
+                terminal.writeln(`❌ 连接失败: ${error.message}`);
+                console.error('连接失败:', error);
+                updateConnectionStatus('disconnected');
+            }
+        }
+
+        function handleTerminalMessage(msg) {
+            switch (msg.type) {
+                case 'output':
+                    if (msg.data && msg.data.length > 0) {
+                        terminal.write(msg.data);
+                    }
+                    break;
+                case 'close':
+                    terminal.writeln('');
+                    terminal.writeln('❌ 会话已关闭');
+                    disconnect();
+                    break;
+                case 'ping':
+                    // 心跳消息，忽略
+                    break;
+            }
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            updateConnectionStatus('disconnected');
+        }
+
+        function updateConnectionStatus(status) {
+            const statusEl = document.getElementById('connection-status');
+            const disconnectBtn = document.getElementById('disconnect-btn');
+
+            if (statusEl) {
+                statusEl.className = 'status ' + status;
+
+                switch (status) {
+                    case 'connected':
+                    statusEl.textContent = '已连接';
+                    disconnectBtn.style.display = 'block';
+                    break;
+                case 'connecting':
+                    statusEl.textContent = '连接中...';
+                    disconnectBtn.style.display = 'none';
+                    break;
+                case 'disconnected':
+                    statusEl.textContent = '未连接';
+                    disconnectBtn.style.display = 'none';
+                    break;
+                }
+            }
+        }
+    </script>
+</body>
+</html>

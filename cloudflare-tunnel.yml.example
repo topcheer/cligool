@@ -1,0 +1,46 @@
+# Cloudflare Tunnel 配置示例
+
+# 1. 首先，创建tunnel并获取ID:
+#    cloudflared tunnel create cligool
+#
+# 2. 将下面的tunnel ID替换为实际的ID
+tunnel: YOUR_TUNNEL_ID_HERE
+
+# 证书文件路径 (自动生成)
+credentials-file: /path/to/YOUR_TUNNEL_ID_HERE.json
+
+# 服务配置
+ingress:
+  # 主域名配置
+  - hostname: cligool.yourdomain.com
+    service: http://localhost:8080
+    # 可选: 添加访问策略
+    # originRequest:
+    #   noTLSVerify: true  # 仅用于测试
+
+  # 可选: 添加更多域名
+  # - hostname: terminal2.yourdomain.com
+  #   service: http://localhost:8080
+
+  # 可选: 配置路径路由
+  # - hostname: cligool.yourdomain.com
+  #   path: /api/*
+  #   service: http://localhost:8080
+
+  # 默认规则 (必须放在最后)
+  - service: http_status:404
+
+# 可选: 配置来源服务器
+# originRequest:
+#   connectTimeout: 30s
+#   tcpKeepAlive: 30s
+#   keepAliveConnections: 100
+#   keepAliveTimeout: 90s
+#   dnsAddress: "1.1.1.1:53"
+
+# 可选: 日志配置
+# logLevel: info
+# logFile: /var/log/cloudflared.log
+
+# 可选: 指标配置
+# metrics: 0.0.0.0:2000
