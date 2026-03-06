@@ -27,6 +27,7 @@ type TerminalMessage struct {
 	Data        string `json:"data"`
 	Session     string `json:"session"`
 	UserID      string `json:"user_id"`
+	Source      string `json:"source,omitempty"` // "local" or "web"
 	WorkingDir  string `json:"working_dir,omitempty"`
 	OSInfo      string `json:"os_info,omitempty"`
 }
@@ -153,6 +154,45 @@ func runTerminalSession(serverURL, sessionID string) error {
 	// 使用带缓冲的写入器并确保每次写入都flush
 	stdinWriter := bufio.NewWriter(stdin)
 
+	// 本地终端输入 -> Stdin
+	go func() {
+		buf := make([]byte, 1024)
+		for {
+			n, err := os.Stdin.Read(buf)
+			if err != nil {
+				if err == io.EOF {
+					return
+				}
+				log.Printf("本地stdin读取失败: %v", err)
+				continue
+			}
+
+			// 写入cmd.exe
+			_, writeErr := stdinWriter.Write(buf[:n])
+			if writeErr != nil {
+				log.Printf("❌ 写入stdin失败（本地输入）: %v", writeErr)
+				continue
+			}
+
+			if err := stdinWriter.Flush(); err != nil {
+				log.Printf("❌ Flush失败（本地输入）: %v", err)
+			}
+
+			// 同时发送到WebSocket，让Web端看到本地输入
+			msg := TerminalMessage{
+				Type:    "input",
+				Data:    string(buf[:n]),
+				Session: sessionID,
+				UserID:  "client",
+				Source:  "local",
+			}
+			jsonData, _ := json.Marshal(msg)
+			if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
+				log.Printf("发送本地输入到WebSocket失败: %v", err)
+			}
+		}
+	}()
+
 	// WebSocket -> Stdin (网页输入写入命令)
 	go func() {
 		for {
@@ -169,7 +209,7 @@ func runTerminalSession(serverURL, sessionID string) error {
 			}
 
 			if msg.Type == "input" && msg.Data != "" {
-				log.Printf("📥 收到输入: %q (长度: %d)", msg.Data, len(msg.Data))
+				log.Printf("📥 收到Web输入: %q (长度: %d)", msg.Data, len(msg.Data))
 
 				// Windows cmd.exe需要CRLF换行符
 				data := []byte(msg.Data)
@@ -222,6 +262,10 @@ func runTerminalSession(serverURL, sessionID string) error {
 				converted = string(data)
 			}
 
+			// 1. 显示到本地终端
+			os.Stderr.Write(data)
+
+			// 2. 同时发送到WebSocket
 			msg := TerminalMessage{
 				Type:    "output",
 				Data:    converted,
@@ -237,7 +281,7 @@ func runTerminalSession(serverURL, sessionID string) error {
 		}
 	}()
 
-	// Stdout -> WebSocket (命令输出发送到网页)
+	// Stdout -> 本地stdout + WebSocket (命令输出同时显示在两端)
 	// 使用更大的缓冲区以处理cmd.exe的大量输出
 	buf := make([]byte, 4096)
 	for {
@@ -260,7 +304,10 @@ func runTerminalSession(serverURL, sessionID string) error {
 			converted = string(data)
 		}
 
-		// 发送到WebSocket
+		// 1. 显示到本地终端
+		os.Stdout.Write(data)
+
+		// 2. 同时发送到WebSocket
 		msg := TerminalMessage{
 			Type:    "output",
 			Data:    converted,

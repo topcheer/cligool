@@ -27,6 +27,7 @@ type TerminalMessage struct {
 	Data        string `json:"data"`
 	Session     string `json:"session"`
 	UserID      string `json:"user_id"`
+	Source      string `json:"source,omitempty"` // "local" or "web"
 	WorkingDir  string `json:"working_dir,omitempty"`
 	OSInfo      string `json:"os_info,omitempty"`
 }
@@ -128,6 +129,40 @@ func runTerminalSession(serverURL, sessionID string) error {
 		}
 	}()
 
+	// 本地终端输入 -> PTY
+	go func() {
+		buf := make([]byte, 1024)
+		for {
+			n, err := os.Stdin.Read(buf)
+			if err != nil {
+				if err == io.EOF {
+					return
+				}
+				log.Printf("本地stdin读取失败: %v", err)
+				continue
+			}
+
+			// 写入PTY
+			if _, err := ptmx.Write(buf[:n]); err != nil {
+				log.Printf("PTY写入失败（本地输入）: %v", err)
+				continue
+			}
+
+			// 同时发送到WebSocket，让Web端看到本地输入
+			msg := TerminalMessage{
+				Type:    "input",
+				Data:    string(buf[:n]),
+				Session: sessionID,
+				UserID:  "client",
+				Source:  "local",
+			}
+			jsonData, _ := json.Marshal(msg)
+			if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
+				log.Printf("发送本地输入到WebSocket失败: %v", err)
+			}
+		}
+	}()
+
 	// WebSocket -> PTY (网页输入写入PTY)
 	// 使用单独的 goroutine 确保输入立即处理
 	go func() {
@@ -146,7 +181,7 @@ func runTerminalSession(serverURL, sessionID string) error {
 			if msg.Type == "input" && msg.Data != "" {
 				// 立即写入PTY，不缓冲
 				if _, err := ptmx.Write([]byte(msg.Data)); err != nil {
-					log.Printf("PTY写入失败: %v", err)
+					log.Printf("PTY写入失败（Web输入）: %v", err)
 					continue
 				}
 			} else if msg.Type == "resize" {
@@ -156,7 +191,7 @@ func runTerminalSession(serverURL, sessionID string) error {
 		}
 	}()
 
-	// PTY -> WebSocket (PTY输出发送到网页)
+	// PTY -> 本地stdout + WebSocket (PTY输出同时显示在两端)
 	// 使用更小的缓冲区以减少延迟
 	buf := make([]byte, 128) // 从1024减少到128字节以减少延迟
 	for {
@@ -175,7 +210,10 @@ func runTerminalSession(serverURL, sessionID string) error {
 			continue
 		}
 
-		// 立即发送到WebSocket，不等待更多数据
+		// 1. 显示到本地终端
+		os.Stdout.Write(data)
+
+		// 2. 同时发送到WebSocket
 		msg := TerminalMessage{
 			Type:    "output",
 			Data:    string(data),
