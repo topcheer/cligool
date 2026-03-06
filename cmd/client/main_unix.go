@@ -84,11 +84,11 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 	fmt.Println("✅ 已连接到中继服务器")
 	fmt.Println("💡 现在可以在Web终端中输入命令了")
 
-	// 发送系统通知，包含 Web 终端 URL
+	// 发送系统通知并自动打开浏览器
 	webURL := fmt.Sprintf("%s/session/%s", serverURL, sessionID)
 	notifier := NewSystemNotifier()
 	if err := notifier.SendWebTerminalNotification(webURL); err == nil {
-		fmt.Println("📱 已发送系统通知，可点击打开 Web 终端")
+		fmt.Println("📱 已发送系统通知并在浏览器中打开 Web 终端")
 	}
 	fmt.Println()
 
