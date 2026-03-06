@@ -209,7 +209,7 @@ func runTerminalSession(serverURL, sessionID string) error {
 			}
 
 			if msg.Type == "input" && msg.Data != "" {
-				log.Printf("📥 收到Web输入: %q (长度: %d)", msg.Data, len(msg.Data))
+				// log.Printf("📥 收到Web输入: %q (长度: %d)", msg.Data, len(msg.Data))
 
 				// Windows cmd.exe需要CRLF换行符
 				data := []byte(msg.Data)
@@ -218,30 +218,23 @@ func runTerminalSession(serverURL, sessionID string) error {
 				if msg.Data == "\r" {
 					data = []byte("\r\n")
 					isCommandEnd = true
-					log.Printf("🔄 转换: \\r → \\r\\n (Windows CRLF)")
+					// log.Printf("🔄 转换: \\r → \\r\\n (Windows CRLF)")
 				}
 
 				written, err := stdinWriter.Write(data)
 				if err != nil {
 					log.Printf("❌ 写入stdin失败: %v", err)
 				} else {
-					log.Printf("✅ 已写入 %d 字节到stdin (缓冲)", written)
 					// 立即flush确保cmd.exe收到输入
 					if err := stdinWriter.Flush(); err != nil {
 						log.Printf("❌ Flush失败: %v", err)
-					} else {
-						log.Printf("✅ 已flush输入缓冲区")
-						// 如果是命令结束（回车），主动触发输出读取
-						if isCommandEnd {
-							log.Printf("🔔 命令结束，触发输出读取")
-						}
 					}
 				}
 			}
 		}
 	}()
 
-	// 同时读取stdout和stderr
+	// stderr读取（只发送到WebSocket，不在本地显示）
 	go func() {
 		// 使用更大的缓冲区
 		buf := make([]byte, 4096)
@@ -249,7 +242,7 @@ func runTerminalSession(serverURL, sessionID string) error {
 			n, err := stderr.Read(buf)
 			if err != nil {
 				if err != io.EOF {
-					log.Printf("stderr读取失败: %v", err)
+					// log.Printf("stderr读取失败: %v", err)
 				}
 				return
 			}
@@ -262,10 +255,7 @@ func runTerminalSession(serverURL, sessionID string) error {
 				converted = string(data)
 			}
 
-			// 1. 显示到本地终端
-			os.Stderr.Write(data)
-
-			// 2. 同时发送到WebSocket
+			// 只发送到WebSocket（不在本地显示，避免GBK乱码）
 			msg := TerminalMessage{
 				Type:    "output",
 				Data:    converted,
@@ -275,7 +265,7 @@ func runTerminalSession(serverURL, sessionID string) error {
 
 			jsonData, _ := json.Marshal(msg)
 			if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
-				log.Printf("WebSocket写入失败(stderr): %v", err)
+				// log.Printf("WebSocket写入失败(stderr): %v", err)
 				return
 			}
 		}
@@ -293,21 +283,15 @@ func runTerminalSession(serverURL, sessionID string) error {
 			return fmt.Errorf("stdout读取失败: %w", err)
 		}
 
-		log.Printf("📤 从stdout读取 %d 字节", n)
-
 		// Windows cmd.exe使用GBK编码，需要转换为UTF-8
 		data := buf[:n]
 		converted, err := convertGBKToUTF8(data)
 		if err != nil {
 			// 如果转换失败，使用原始数据
-			log.Printf("⚠️  GBK转换失败: %v，使用原始数据", err)
 			converted = string(data)
 		}
 
-		// 1. 显示到本地终端
-		os.Stdout.Write(data)
-
-		// 2. 同时发送到WebSocket
+		// 只发送到WebSocket（不在本地显示，避免GBK乱码）
 		msg := TerminalMessage{
 			Type:    "output",
 			Data:    converted,
@@ -319,8 +303,6 @@ func runTerminalSession(serverURL, sessionID string) error {
 		if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
 			return fmt.Errorf("WebSocket写入失败: %w", err)
 		}
-
-		log.Printf("✅ 已发送 %d 字节到WebSocket", len(converted))
 	}
 }
 
