@@ -334,6 +334,15 @@
                         terminal.write(msg.data);
                     }
                     break;
+                case 'input':
+                    // 输入回显（主要用于Windows管道模式下的本地输入）
+                    if (msg.data && msg.data.length > 0) {
+                        // 只在输入来自本地时回显，避免Web端重复回显
+                        if (msg.source === 'local') {
+                            terminal.write(msg.data);
+                        }
+                    }
+                    break;
                 case 'close':
                     terminal.writeln('');
                     terminal.writeln('❌ 会话已关闭');

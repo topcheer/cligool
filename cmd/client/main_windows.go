@@ -191,8 +191,10 @@ func runTerminalSession(serverURL, sessionID string) error {
 				continue
 			}
 
+			data := buf[:n]
+
 			// 写入cmd.exe
-			_, writeErr := stdinWriter.Write(buf[:n])
+			_, writeErr := stdinWriter.Write(data)
 			if writeErr != nil {
 				log.Printf("写入stdin失败（本地输入）: %v", writeErr)
 				continue
@@ -202,10 +204,13 @@ func runTerminalSession(serverURL, sessionID string) error {
 				log.Printf("Flush失败（本地输入）: %v", err)
 			}
 
+			// 本地回显输入字符（Windows管道模式不会自动回显）
+			os.Stdout.Write(data)
+
 			// 同时发送到WebSocket，让Web端看到本地输入
 			msg := TerminalMessage{
 				Type:    "input",
-				Data:    string(buf[:n]),
+				Data:    string(data),
 				Session: sessionID,
 				UserID:  "client",
 				Source:  "local",
