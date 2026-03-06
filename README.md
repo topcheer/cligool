@@ -3,8 +3,11 @@
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://golang.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Platforms](https://img.shields.io/badge/platforms-18-blue)](#-支持的平台)
+[![Demo](https://img.shields.io/badge/demo-online-success.svg)](https://cligool.zty8.cn/)
 
 一个基于Go和WebSocket的跨平台远程终端解决方案，支持18种操作系统和架构。
+
+**[🚀 在线体验](https://cligool.zty8.cn/)** | **[📥 下载客户端](https://cligool.zty8.cn/)**
 
 ## ✨ 核心特性
 
@@ -60,6 +63,23 @@ CLI客户端            中继服务器              Web浏览器
 ### macOS (2个)
 - macOS Intel (Intel处理器)
 - macOS ARM (Apple M1/M2/M3)
+
+## 🎮 在线体验
+
+不想本地部署？可以先体验在线Demo！
+
+### 访问在线Demo
+
+👉 **[https://cligool.zty8.cn/](https://cligool.zty8.cn/)**
+
+### Demo使用步骤
+
+1. **下载客户端**：在下载页面选择你操作系统的客户端
+2. **运行客户端**：启动下载的客户端程序
+3. **访问Web终端**：使用客户端显示的会话ID访问Web界面
+4. **开始体验**：在浏览器中体验完整的远程终端功能
+
+**注意**：在线Demo仅供体验使用，可能随时关闭。建议自行部署以获得稳定服务。
 
 ## 🚀 快速开始
 
