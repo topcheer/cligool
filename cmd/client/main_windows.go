@@ -14,11 +14,18 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"syscall"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"golang.org/x/text/encoding"
+	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/encoding/japanese"
+	"golang.org/x/text/encoding/korean"
 	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/encoding/traditionalchinese"
 	"golang.org/x/text/transform"
 )
 
@@ -32,7 +39,13 @@ type TerminalMessage struct {
 	OSInfo      string `json:"os_info,omitempty"`
 }
 
+// 全局编码转换器
+var consoleEncoding encoding.Encoding
+
 func main() {
+	// 初始化控制台编码
+	consoleEncoding = getConsoleEncoding()
+
 	log.Println("CliGool Windows客户端启动...")
 
 	serverURL := flag.String("server", "https://cligool.zty8.cn", "中继服务器URL")
@@ -252,8 +265,8 @@ func runTerminalSession(serverURL, sessionID string) error {
 			}
 
 			data := buf[:n]
-			// Windows cmd.exe使用GBK编码，需要转换为UTF-8
-			converted, err := convertGBKToUTF8(data)
+			// 转换控制台编码到UTF-8
+			converted, err := convertToUTF8(data)
 			if err != nil {
 				// 如果转换失败，使用原始数据
 				converted = string(data)
@@ -287,11 +300,11 @@ func runTerminalSession(serverURL, sessionID string) error {
 			return fmt.Errorf("stdout读取失败: %w", err)
 		}
 
-		// Windows cmd.exe使用GBK编码，需要转换为UTF-8
+		// Windows cmd.exe使用控制台编码，需要转换为UTF-8
 		data := buf[:n]
 
-		// 转换为UTF-8
-		converted, err := convertGBKToUTF8(data)
+		// 转换控制台编码到UTF-8
+		converted, err := convertToUTF8(data)
 		if err != nil {
 			// 如果转换失败，使用原始数据
 			converted = string(data)
@@ -313,13 +326,59 @@ func runTerminalSession(serverURL, sessionID string) error {
 	}
 }
 
-// convertGBKToUTF8 将GBK编码的字节转换为UTF-8字符串
-func convertGBKToUTF8(data []byte) (string, error) {
-	// 使用简体中文GBK编码
-	reader := transform.NewReader(bytes.NewReader(data), simplifiedchinese.GBK.NewDecoder())
+// getConsoleEncoding 获取控制台输出编码
+func getConsoleEncoding() encoding.Encoding {
+	// 获取控制台输出code page
+	kernel32 := syscall.NewLazyDLL("kernel32.dll")
+	getConsoleOutputCP := kernel32.NewProc("GetConsoleOutputCP")
+
+	codePage, _, _ := getConsoleOutputCP.Call()
+	log.Printf("检测到控制台code page: %d", codePage)
+
+	// 根据code page返回对应的编码
+	switch codePage {
+	case 932:
+		// 日文 Shift-JIS
+		return japanese.ShiftJIS
+	case 936:
+		// 简体中文 GBK
+		return simplifiedchinese.GBK
+	case 949:
+		// 韩文 EUC-KR
+		return korean.EUCKR
+	case 950:
+		// 繁体中文 Big5
+		return traditionalchinese.Big5
+	case 1252:
+		// 西欧 Latin-1
+		return charmap.Windows1252
+	case 437:
+		// 英文 CP437
+		return charmap.CodePage437
+	default:
+		// 默认使用Latin-1，可以处理所有单字节字符
+		log.Printf("未知的code page %d，使用Latin-1编码", codePage)
+		return charmap.Windows1252
+	}
+}
+
+// convertToUTF8 将控制台编码的字节转换为UTF-8字符串
+func convertToUTF8(data []byte) (string, error) {
+	if consoleEncoding == nil {
+		// 如果无法检测编码，尝试直接作为UTF-8
+		if utf8.Valid(data) {
+			return string(data), nil
+		}
+		// 否则作为Latin-1处理
+		decoded, _ := charmap.Windows1252.NewDecoder().Bytes(data)
+		return string(decoded), nil
+	}
+
+	reader := transform.NewReader(bytes.NewReader(data), consoleEncoding.NewDecoder())
 	converted, err := io.ReadAll(reader)
 	if err != nil {
-		return "", err
+		// 转换失败时，返回原始字符串
+		return string(data), nil
 	}
 	return string(converted), nil
 }
