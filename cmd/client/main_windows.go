@@ -170,31 +170,26 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 	log.Printf("已发送初始化消息: 工作目录=%s, 大小=%dx%d", wd, cols, rows)
 
 	// Windows上使用cmd.exe或者用户指定的命令
-	var cmdName string
+	var cmd *exec.Cmd
 	if execCmd != "" {
-		cmdName = execCmd
-		log.Printf("准备启动命令: %s", cmdName)
+		// 直接启动指定的命令
+		log.Printf("准备启动命令: %s", execCmd)
+		cmd = exec.Command(execCmd)
 	} else {
-		cmdName = "cmd.exe"
+		// 默认使用 cmd.exe
 		log.Println("准备启动cmd.exe...")
+		cmd = exec.Command("cmd.exe")
 	}
 
-	// 创建命令
-	cmd := exec.Command(cmdName)
-
 	// 设置环境变量以确保终端工具正确工作
-	env := append(os.Environ(),
+	cmd.Env = append(os.Environ(),
 		"TERM=xterm-256color",
 		"COLORTERM=truecolor",  // 启用真色支持
 		"FORCE_COLOR=1",         // 强制启用颜色
 	)
 
 	// Windows 上不需要 LANG/LC_ALL，但确保使用 UTF-8 代码页
-	env = append(env, "PYTHONIOENCODING=utf-8")  // Python 工具使用 UTF-8
-
-	cmd.Env = env
-	// 禁用命令行参数处理，保持交互模式
-	cmd.Args = []string{cmdName}
+	cmd.Env = append(cmd.Env, "PYTHONIOENCODING=utf-8")  // Python 工具使用 UTF-8
 
 	log.Println("创建输入管道...")
 	// 创建输入输出管道
