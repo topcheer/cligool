@@ -209,19 +209,14 @@ func runTerminalSession(serverURL, sessionID string) error {
 			}
 
 			if msg.Type == "input" && msg.Data != "" {
-				// log.Printf("📥 收到Web输入: %q (长度: %d)", msg.Data, len(msg.Data))
-
 				// Windows cmd.exe需要CRLF换行符
 				data := []byte(msg.Data)
 				// 将单独的"\r"转换为"\r\n" (Windows标准换行符)
-				isCommandEnd := false
 				if msg.Data == "\r" {
 					data = []byte("\r\n")
-					isCommandEnd = true
-					// log.Printf("🔄 转换: \\r → \\r\\n (Windows CRLF)")
 				}
 
-				written, err := stdinWriter.Write(data)
+				_, err := stdinWriter.Write(data)
 				if err != nil {
 					log.Printf("❌ 写入stdin失败: %v", err)
 				} else {
