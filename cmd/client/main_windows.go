@@ -37,6 +37,8 @@ type TerminalMessage struct {
 	Source      string `json:"source,omitempty"` // "local" or "web"
 	WorkingDir  string `json:"working_dir,omitempty"`
 	OSInfo      string `json:"os_info,omitempty"`
+	Rows        int    `json:"rows,omitempty"`    // 终端行数
+	Cols        int    `json:"cols,omitempty"`    // 终端列数
 }
 
 // 全局编码转换器
@@ -50,6 +52,8 @@ func main() {
 
 	serverURL := flag.String("server", "https://cligool.zty8.cn", "中继服务器URL")
 	sessionID := flag.String("session", "", "会话ID")
+	cols := flag.Int("cols", 80, "终端列数")
+	rows := flag.Int("rows", 24, "终端行数")
 	flag.Parse()
 
 	sid := *sessionID
@@ -65,7 +69,7 @@ func main() {
 	log.Println("开始连接WebSocket...")
 
 	// 启动WebSocket并运行终端会话
-	if err := runTerminalSession(*serverURL, sid); err != nil {
+	if err := runTerminalSession(*serverURL, sid, *cols, *rows); err != nil {
 		log.Printf("终端会话失败: %v", err)
 		fmt.Printf("连接失败: %v\n", err)
 		os.Exit(1)
@@ -83,7 +87,7 @@ func printHeader(sessionID, serverURL string) {
 	fmt.Println()
 }
 
-func runTerminalSession(serverURL, sessionID string) error {
+func runTerminalSession(serverURL, sessionID string, cols, rows int) error {
 	log.Println("开始建立WebSocket连接...")
 
 	// 建立 WebSocket 连接
@@ -130,10 +134,12 @@ func runTerminalSession(serverURL, sessionID string) error {
 		UserID:      "client",
 		WorkingDir:  wd,
 		OSInfo:      "windows",
+		Rows:        rows,
+		Cols:        cols,
 	}
 	jsonData, _ := json.Marshal(initMsg)
 	wsWriteChan <- jsonData
-	log.Printf("已发送初始化消息: 工作目录=%s", wd)
+	log.Printf("已发送初始化消息: 工作目录=%s, 大小=%dx%d", wd, cols, rows)
 
 	log.Println("准备启动cmd.exe...")
 

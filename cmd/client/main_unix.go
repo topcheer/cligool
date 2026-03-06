@@ -30,11 +30,15 @@ type TerminalMessage struct {
 	Source      string `json:"source,omitempty"` // "local" or "web"
 	WorkingDir  string `json:"working_dir,omitempty"`
 	OSInfo      string `json:"os_info,omitempty"`
+	Rows        int    `json:"rows,omitempty"`    // 终端行数
+	Cols        int    `json:"cols,omitempty"`    // 终端列数
 }
 
 func main() {
 	serverURL := flag.String("server", "https://cligool.zty8.cn", "中继服务器URL")
 	sessionID := flag.String("session", "", "会话ID")
+	cols := flag.Int("cols", 80, "终端列数")
+	rows := flag.Int("rows", 24, "终端行数")
 	flag.Parse()
 
 	sid := *sessionID
@@ -46,7 +50,7 @@ func main() {
 	printHeader(sid, *serverURL)
 
 	// 启动WebSocket并运行PTY
-	if err := runTerminalSession(*serverURL, sid); err != nil {
+	if err := runTerminalSession(*serverURL, sid, *cols, *rows); err != nil {
 		log.Fatalf("终端会话失败: %v", err)
 	}
 }
@@ -62,7 +66,7 @@ func printHeader(sessionID, serverURL string) {
 	fmt.Println()
 }
 
-func runTerminalSession(serverURL, sessionID string) error {
+func runTerminalSession(serverURL, sessionID string, cols, rows int) error {
 	// 建立 WebSocket 连接
 	wsURL, _ := buildWebSocketURL(serverURL, sessionID)
 	dialer := websocket.DefaultDialer
@@ -104,10 +108,12 @@ func runTerminalSession(serverURL, sessionID string) error {
 		UserID:      "client",
 		WorkingDir:  wd,
 		OSInfo:      "unix",
+		Rows:        rows,
+		Cols:        cols,
 	}
 	jsonData, _ := json.Marshal(initMsg)
 	wsWriteChan <- jsonData
-	log.Printf("✅ 已发送初始化消息: 工作目录=%s", wd)
+	log.Printf("✅ 已发送初始化消息: 工作目录=%s, 大小=%dx%d", wd, cols, rows)
 
 	// 创建 PTY
 	shell := os.Getenv("SHELL")
@@ -126,9 +132,22 @@ func runTerminalSession(serverURL, sessionID string) error {
 	}
 	defer ptmx.Close()
 
+	// 设置初始PTY窗口大小
+	if err := pty.Setsize(ptmx, &pty.Winsize{
+		Rows: uint16(rows),
+		Cols: uint16(cols),
+	}); err != nil {
+		log.Printf("设置PTY窗口大小失败: %v", err)
+	}
+
 	// 处理窗口大小变化
 	handleResize := func() {
-		// 这里可以添加窗口大小调整逻辑
+		// 获取当前终端窗口大小
+		if size, err := pty.GetsizeFull(ptmx); err == nil {
+			if err := pty.Setsize(ptmx, size); err != nil {
+				log.Printf("更新PTY窗口大小失败: %v", err)
+			}
+		}
 	}
 
 	// 设置信号处理
