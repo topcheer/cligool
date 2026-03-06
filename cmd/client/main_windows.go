@@ -110,6 +110,12 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 	fmt.Println("Windows模式：功能可能受限")
 	fmt.Println()
 
+	// 显示可点击的 Web 终端 URL
+	webURL := fmt.Sprintf("%s/session/%s", serverURL, sessionID)
+	fmt.Println("🌐 Web终端访问地址：")
+	fmt.Printf("   %s\n", webURL)
+	fmt.Println()
+
 	// 创建WebSocket写入channel，确保串行写入
 	wsWriteChan := make(chan []byte, 100)
 

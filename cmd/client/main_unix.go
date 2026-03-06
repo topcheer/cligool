@@ -83,7 +83,13 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 	log.Println("✅ WebSocket已连接")
 	fmt.Println("✅ 已连接到中继服务器")
 	fmt.Println("💡 现在可以在Web终端中输入命令了")
-	fmt.Println()
+
+	// 显示可点击的 Web 终端 URL
+	webURL := fmt.Sprintf("%s/session/%s", serverURL, sessionID)
+	fmt.Println("")
+	fmt.Println("🌐 Web终端访问地址：")
+	printClickableURL(webURL)
+	fmt.Println("")
 
 	// 创建WebSocket写入channel，确保串行写入
 	wsWriteChan := make(chan []byte, 100)
@@ -199,10 +205,6 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 		}
 	}()
 
-	// 创建 URL 通知器（检测到公网 URL 时弹出系统提示）
-	urlNotifier := NewURLNotifier(true)
-	log.Println("URL 通知器已启用")
-
 	// 将本地终端设置为原始模式，以便立即发送每个按键
 	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
 	if err != nil {
@@ -296,10 +298,7 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 			// 1. 显示到本地终端
 			os.Stdout.Write(output)
 
-			// 2. 检测并发送 URL 通知
-			urlNotifier.Process(output)
-
-			// 3. 同时发送到WebSocket
+			// 2. 同时发送到WebSocket
 			msg := TerminalMessage{
 				Type:    "output",
 				Data:    string(output),
@@ -316,6 +315,18 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 			ptmx.Write(responses)
 		}
 	}
+}
+
+func printClickableURL(url string) {
+	// 尝试使用 OSC-8 超链接序列（支持的终端：iTerm2, Terminal.app, Windows Terminal 等）
+	// 格式: ESC ] 8 ; ; url \ ESC \ 文本 ESC ] 8 ; ; \ ESC \
+	osc8Link := fmt.Sprintf("\x1b]8;;%s\x1b\\%s\x1b]8;;\x1b\\", url, url)
+
+	// 直接打印可点击的链接
+	fmt.Printf("   %s", osc8Link)
+
+	// 也打印普通格式作为备用
+	fmt.Printf("\n   %s\n", url)
 }
 
 func buildWebSocketURL(serverURL, sessionID string) (string, error) {
