@@ -286,13 +286,17 @@ func runTerminalSession(serverURL, sessionID string) error {
 
 		// Windows cmd.exe使用GBK编码，需要转换为UTF-8
 		data := buf[:n]
+
+		// 1. 显示到本地终端（原始GBK数据，可能有乱码）
+		os.Stdout.Write(data)
+
+		// 2. 转换为UTF-8发送到WebSocket
 		converted, err := convertGBKToUTF8(data)
 		if err != nil {
 			// 如果转换失败，使用原始数据
 			converted = string(data)
 		}
 
-		// 只发送到WebSocket（不在本地显示，避免GBK乱码）
 		msg := TerminalMessage{
 			Type:    "output",
 			Data:    converted,
