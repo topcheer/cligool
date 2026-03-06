@@ -26,6 +26,8 @@ type TerminalMessage struct {
 }
 
 func main() {
+	log.Println("🚀 CliGool Windows客户端启动...")
+
 	serverURL := flag.String("server", "https://cligool.zty8.cn", "中继服务器URL")
 	sessionID := flag.String("session", "", "会话ID")
 	flag.Parse()
@@ -35,12 +37,18 @@ func main() {
 		sid = uuid.New().String()
 	}
 
+	log.Println("📋 会话ID:", sid)
+
 	// 显示连接信息
 	printHeader(sid, *serverURL)
 
+	log.Println("🔗 开始连接WebSocket...")
+
 	// 启动WebSocket并运行终端会话
 	if err := runTerminalSession(*serverURL, sid); err != nil {
-		log.Fatalf("终端会话失败: %v", err)
+		log.Printf("❌ 终端会话失败: %v", err)
+		fmt.Printf("连接失败: %v\n", err)
+		os.Exit(1)
 	}
 }
 
@@ -56,10 +64,14 @@ func printHeader(sessionID, serverURL string) {
 }
 
 func runTerminalSession(serverURL, sessionID string) error {
+	log.Println("🔧 开始建立WebSocket连接...")
+
 	// 建立 WebSocket 连接
 	wsURL, _ := buildWebSocketURL(serverURL, sessionID)
 	dialer := websocket.DefaultDialer
 	dialer.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+
+	log.Println("📡 WebSocket URL:", wsURL)
 
 	conn, _, err := dialer.Dial(wsURL, nil)
 	if err != nil {
@@ -73,16 +85,20 @@ func runTerminalSession(serverURL, sessionID string) error {
 	fmt.Println("⚠️  Windows模式：功能可能受限")
 	fmt.Println()
 
+	log.Println("🔧 准备启动cmd.exe...")
+
 	// Windows上使用cmd.exe而不是PTY
 	cmd := exec.Command("cmd.exe")
 	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
 
+	log.Println("📝 创建输入管道...")
 	// 创建输入输出管道
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return fmt.Errorf("创建stdin管道失败: %w", err)
 	}
 
+	log.Println("📝 创建输出管道...")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("创建stdout管道失败: %w", err)
@@ -93,13 +109,15 @@ func runTerminalSession(serverURL, sessionID string) error {
 		return fmt.Errorf("创建stderr管道失败: %w", err)
 	}
 
+	log.Println("🚀 启动cmd.exe进程...")
 	// 启动命令
 	if err := cmd.Start(); err != nil {
+		log.Printf("❌ cmd.exe启动失败: %v", err)
 		return fmt.Errorf("启动命令失败: %w", err)
 	}
 	defer cmd.Process.Kill()
 
-	log.Println("✅ Windows命令行已启动")
+	log.Println("✅ cmd.exe已启动，PID:", cmd.Process.Pid)
 
 	// WebSocket -> Stdin (网页输入写入命令)
 	go func() {
