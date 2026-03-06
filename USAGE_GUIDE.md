@@ -1,113 +1,319 @@
-# CliGool - 正确的远程终端架构
+# CliGool - User Guide
 
-## 🏗️ 正确的系统架构
+A Go and WebSocket-based cross-platform remote terminal solution supporting 18 operating systems and architectures.
+
+## 🏗️ System Architecture
 
 ```
-用户A的电脑(有真实终端)          中继服务器               用户B的浏览器
+CLI Client          Relay Server          Web Browser
 ┌──────────────┐              ┌──────────┐              ┌─────────────┐
-│ CLI客户端     │──WebSocket──▶│ 消息转发器│◀──WebSocket───│  独立HTML     │
-│ (真实PTY)     │              │          │              │  (本地文件)   │
+│ Real PTY     │──WebSocket──▶│ Message  │◀──WebSocket───│  xterm.js    │
+│              │              │ Forwarder│              │  Terminal    │
+│ 18 Platforms │              │          │              │              │
 └──────────────┘              └──────────┘              └─────────────┘
 ```
 
-## 🚀 正确的使用流程
+**Key Features**:
+- ✅ **Real PTY**: CLI client provides complete terminal environment
+- ✅ **Message Forwarding**: Relay server routes WebSocket messages
+- ✅ **Independent Interface**: Web interface based on xterm.js
+- ✅ **Session Management**: Create, delete, and list sessions
 
-### 第一步：启动CLI客户端
+## 🚀 Quick Start
+
+### Method 1: Docker Compose (Recommended)
+
+#### 1. Start Relay Server
+
 ```bash
-# 在有真实终端的机器上（如你的Mac/PC）
-./bin/cligool-simple -connect-only
+# Clone repository
+git clone https://github.com/topcheer/cligool.git
+cd cligool
+
+# Start all services
+docker-compose up -d
+
+# Check service status
+docker-compose ps
 ```
 
-输出示例：
+**Expected Output**:
 ```
-🚀 连接到中继服务器: https://cligool.zty8.cn
-📋 会话ID: abc123-def456-7890-abcd-ef1234567890
-🌐 Web访问地址: https://cligool.zty8.cn/?session=abc123-def456-7890-abcd-ef1234567890
-✅ WebSocket连接成功！
+NAME                STATUS
+cligool-relay       Up (healthy)
+cligool-postgres    Up
+cligool-redis       Up
 ```
 
-### 第二步：打开Web界面
+#### 2. Start CLI Client
+
+**On the machine you want to control remotely**:
+
 ```bash
-# 下载独立的Web界面文件到本地
-curl -o ~/Desktop/cligool.html https://cligool.zty8.cn/web-client.html
+# Download client for your platform
+# Get from download page: http://localhost:8081/
 
-# 或者直接复制以下内容保存为HTML文件...
+# Start client (connect to local server)
+./cligool -server http://localhost:8081
+
+# Or connect to remote server
+./cligool -server https://your-server.com
 ```
 
-或者将 `web-client.html` 文件传给你的用户，让他们在浏览器中打开。
+**Output Example**:
+```
+╔═══════════════════════════════════════════════════════════╗
+║              🚀 CliGool Remote Terminal                    ║
+╠═══════════════════════════════════════════════════════════╣
+║ 📋 Session ID: abc123-def456-7890-abcd-ef1234567890      ║
+║ 🌐 Web Access: http://localhost:8081/session/abc123-...    ║
+║ 🔗 Status: 🟢 Connected                                   ║
+╚═══════════════════════════════════════════════════════════╝
+```
 
-### 第三步：连接Web界面
-1. 在浏览器中打开 `web-client.html`
-2. 输入会话ID：`abc123-def456-7890-abcd-ef1234567890`
-3. 点击"连接"按钮
-4. 开始远程控制终端！
+#### 3. Open Web Interface
 
-## 📋 文件说明
+Visit in your browser:
+```
+http://localhost:8081/session/[session-id]
+```
 
-- **web-client.html** - 独立的Web界面，用户本地打开
-- **cligool-simple** - 简化版客户端，只建立连接
-- **cligool-client** - 完整客户端（需要PTY权限）
+Or visit the download page:
+```
+http://localhost:8081/
+```
 
-## 🌟 完整场景示例
+### Method 2: Manual Build
 
-### 场景1：远程访问你的Mac
+#### 1. Build Relay Server
+
 ```bash
-# 在你的Mac上
-./bin/cligool-simple -connect-only
+# Build server
+go build -o bin/relay-server ./cmd/relay
 
-# 得到会话ID后，在办公室电脑的浏览器中打开web-client.html
-# 输入会话ID，连接！
+# Run server
+./bin/relay-server
 ```
 
-### 场景2：技术支持
+#### 2. Build Client
+
 ```bash
-# 朋友的电脑出现问题
-# 让朋友运行: ./bin/cligool-simple -connect-only
-# 你得到会话ID后，在浏览器中连接
-# 远程查看和操作朋友的终端
+# Build for current platform
+go build -o cligool ./cmd/client
+
+# Cross-compile for other platforms
+GOOS=linux GOARCH=amd64 go build -o cligool-linux-amd64 ./cmd/client
+GOOS=windows GOARCH=amd64 go build -o cligool-windows-amd64.exe ./cmd/client
+GOOS=darwin GOARCH=arm64 go build -o cligool-darwin-arm64 ./cmd/client
 ```
 
-### 场景3：团队协作
+## 🌍 Supported Platforms
+
+### Windows (2 platforms)
+- Windows amd64 (Intel/AMD 64-bit)
+- Windows arm64 (Surface Pro X and other ARM devices)
+
+### Linux (8 platforms)
+- Linux amd64 (Ubuntu, Debian, CentOS, etc.)
+- Linux arm64 (Raspberry Pi 4/5, ARM servers)
+- Linux 386 (32-bit x86 systems)
+- Linux arm (Raspberry Pi and other 32-bit ARM devices)
+- Linux ppc64le (PowerPC systems)
+- Linux riscv64 (RISC-V architecture)
+- Linux s390x (IBM System z mainframes)
+- Linux mips64le (MIPS architecture)
+
+### *BSD Systems (6 platforms)
+- FreeBSD amd64/arm64
+- OpenBSD amd64/arm64
+- NetBSD amd64
+- DragonFlyBSD amd64
+
+### macOS (2 platforms)
+- macOS Intel (Intel processors)
+- macOS ARM (Apple M1/M2/M3)
+
+## 💡 Use Cases
+
+### 1. Remote Home Access
+
 ```bash
-# 服务器上运行: ./bin/cligool-simple -connect-only
-# 团队成员各自在浏览器中打开web-client.html
-# 输入同一个会话ID，多人同时查看
+# Start client on home Mac
+./cligool-darwin-arm64 -server https://your-server.com
+
+# Connect from office browser
+# Use generated session ID
 ```
 
-## 🔧 Web界面使用方式
+### 2. Server Management
 
-**方式1：托管版本** (暂时不可用，需要重新设计)
 ```bash
-# 访问 https://cligool.zty8.cn (当前版本不正确)
+# Run on Linux server
+./cligool-linux-amd64 -server https://your-server.com
+
+# Manage from mobile browser
 ```
 
-**方式2：本地文件** (推荐)
+### 3. Tech Support
+
 ```bash
-# 下载独立HTML文件
-curl -o cligool.html https://cligool.zty8.cn/web-client.html
-
-# 在浏览器中打开
-open cligool.html
+# Friend's computer has issues
+# Have friend download and run client for their platform
+# Remotely assist from your browser
 ```
 
-## 💡 关键点
+### 4. Team Collaboration
 
-1. **CLI客户端必须先启动** - 提供真实的PTY
-2. **Web界面后连接** - 连接到已建立的会话
-3. **中继服务器只转发** - 不启动任何终端
+```bash
+# Multiple people connect to same session
+# Real-time viewing and control
+```
 
-## 🎯 优势
+## 🔧 Advanced Features
 
-- ✅ **真正安全** - Web界面是本地文件，无中间人
-- ✅ **灵活部署** - Web界面可以托管在任何地方
-- ✅ **协作友好** - 多人可同时查看同一会话
-- ✅ **无需复杂权限** - Web端不需要PTY权限
+### Heartbeat Keep-Alive
 
-## ⚠️ 当前状态
+Bidirectional WebSocket heartbeat mechanism:
+- **Server → Client**: Send ping every 30 seconds
+- **Client → Server**: Auto-reply with pong
+- **Timeout Detection**: Auto-disconnect after 90 seconds
 
-- ✅ **中继服务器**: 正常运行，支持WebSocket转发
-- ✅ **CLI客户端**: 可以建立连接，部分环境下PTY有限制
-- ✅ **Web客户端**: 独立HTML文件，可本地打开使用
-- ⚠️ **完整实现**: 需要Web界面能正确显示和连接
+### Auto-Reconnect
 
-你现在可以试用正确的架构了！
+Web interface supports auto-reconnection:
+- Auto-retry on disconnect
+- Exponential backoff strategy
+- Manual reconnect button
+
+### Session Management
+
+```bash
+# Create new session
+curl -X POST http://localhost:8081/api/sessions \
+  -H "Content-Type: application/json" \
+  -d '{"owner": "user@example.com"}'
+
+# List all sessions
+curl http://localhost:8081/api/sessions
+
+# Get session details
+curl http://localhost:8081/api/sessions/{session_id}
+
+# Delete session
+curl -X DELETE http://localhost:8081/api/sessions/{session_id}
+```
+
+## 🔍 Troubleshooting
+
+### Client Connection Failed
+
+**Problem**: `WebSocket connection failed`
+
+**Solution**:
+```bash
+# 1. Check if server is running
+curl http://localhost:8081/api/health
+
+# 2. Check server logs
+docker logs cligool-relay
+
+# 3. Check firewall settings
+# Ensure port 8081 is accessible
+```
+
+### Terminal Not Responding
+
+**Problem**: No output after entering commands
+
+**Solution**:
+1. Check WebSocket connection status (browser console)
+2. Confirm client process is still running
+3. Try refreshing the page to reconnect
+
+### Windows Client Garbled Text
+
+**Problem**: Chinese characters display as gibberish
+
+**Solution**:
+- ✅ Auto-fixed: GBK encoding automatically converted to UTF-8
+- If issues persist, check terminal encoding settings
+
+### PTY Permission Issues (Linux/macOS)
+
+**Problem**: `Failed to allocate PTY`
+
+**Solution**:
+```bash
+# Check /dev/ptmx permissions
+ls -l /dev/ptmx
+
+# Ensure running in real terminal (not IDE built-in terminal)
+# Some IDE terminals may not support PTY
+```
+
+## 🚀 Production Deployment
+
+### Using Docker Compose
+
+```bash
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f relay-server
+
+# Stop services
+docker-compose down
+```
+
+### Using Cloudflare Tunnel (HTTPS)
+
+1. Install cloudflared
+2. Create tunnel: `cloudflared tunnel create cligool`
+3. Configure `~/.cloudflared/config.yml`:
+```yaml
+tunnel: <your-tunnel-id>
+credentials-file: /path/to/credentials.json
+
+ingress:
+  - hostname: cligool.yourdomain.com
+    service: http://localhost:8081
+  - service: http_status:404
+```
+
+4. Start tunnel: `cloudflared tunnel run`
+
+### Environment Variables
+
+```bash
+# Database connection
+DATABASE_URL=postgres://user:pass@host:5432/cligool?sslmode=disable
+
+# Redis connection
+REDIS_URL=redis://host:6379
+
+# Server configuration
+RELAY_HOST=0.0.0.0
+RELAY_PORT=8080
+```
+
+## 📚 More Documentation
+
+- [README.md](../README.md) - Project Overview
+- [DEPLOYMENT.md](DEPLOYMENT.md) - Deployment Guide
+- [DEVELOPMENT.md](DEVELOPMENT.md) - Development Guide
+- [PTY_TROUBLESHOOTING.md](PTY_TROUBLESHOOTING.md) - PTY Issues
+
+## 🤝 Contributing
+
+Issues and Pull Requests are welcome!
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Open a Pull Request
+
+## 📝 License
+
+MIT License - see [LICENSE](../LICENSE) file for details

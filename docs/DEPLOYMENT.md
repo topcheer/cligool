@@ -1,24 +1,27 @@
 # CliGool 部署指南
 
-## 🚀 一键部署
+## 🚀 快速部署
 
-### 在任何Docker服务器上部署
+### Docker Compose 一键部署（推荐）
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/cligool/cligool.git
+git clone https://github.com/topcheer/cligool.git
 cd cligool
 
-# 2. 运行部署脚本
-./scripts/deploy.sh
+# 2. 启动所有服务
+docker-compose up -d
 
-# 3. 配置Cloudflare Tunnel
-./scripts/cloudflare-tunnel.sh
+# 3. 检查服务状态
+docker-compose ps
+
+# 4. 查看日志
+docker-compose logs -f relay-server
 ```
 
-就这样！你的服务现在可以通过Cloudflare Tunnel访问了。
+就这样！你的服务现在运行在 `http://localhost:8081`
 
-## 📋 详细步骤
+## 📋 详细部署步骤
 
 ### 第一步: 准备服务器
 
@@ -26,347 +29,374 @@ cd cligool
 - **操作系统**: Linux (任何发行版)、macOS、Windows
 - **内存**: 512MB+
 - **磁盘**: 10GB+
-- **网络**: 能够访问Cloudflare
+- **网络**: 能够访问Docker Hub
 
 #### 安装Docker
-```bash
-# Ubuntu/Debian
-curl -fsSL https://get.docker.com -o get-docker.sh
-sh get-docker.sh
 
-# CentOS/RHEL
+**Ubuntu/Debian**:
+```bash
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker $USER
+```
+
+**CentOS/RHEL**:
+```bash
 sudo yum install -y docker
 sudo systemctl start docker
 sudo systemctl enable docker
-
-# macOS
-brew install docker
+sudo usermod -aG docker $USER
 ```
+
+**macOS**:
+```bash
+brew install --cask docker
+# 启动Docker Desktop应用
+```
+
+**Windows**:
+- 下载并安装 [Docker Desktop](https://www.docker.com/products/docker-desktop)
 
 #### 安装Docker Compose
+
+**Linux**:
 ```bash
-# Linux
 sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 sudo chmod +x /usr/local/bin/docker-compose
-
-# macOS (包含在Docker Desktop中)
-# 无需额外安装
 ```
+
+**macOS/Windows**:
+- 已包含在Docker Desktop中
 
 ### 第二步: 部署应用
 
 ```bash
-# 1. 下载项目
-git clone https://github.com/cligool/cligool.git
+# 1. 克隆仓库
+git clone https://github.com/topcheer/cligool.git
 cd cligool
 
-# 2. 运行部署脚本
-./scripts/deploy.sh
+# 2. 配置环境变量（可选）
+cp .env.example .env
+# 编辑.env文件设置数据库密码等
 
-# 3. 检查服务状态
+# 3. 启动所有服务
+docker-compose up -d
+
+# 4. 等待服务启动（约30秒）
+sleep 30
+
+# 5. 检查服务状态
 docker-compose ps
 ```
 
-### 第三步: 配置Cloudflare Tunnel
+**预期输出**:
+```
+NAME                STATUS
+cligool-postgres    Up (healthy)
+cligool-redis       Up (healthy)
+cligool-relay       Up (healthy)
+```
 
-#### 安装cloudflared
+### 第三步: 验证部署
+
 ```bash
-# Linux (amd64)
+# 检查API健康状态
+curl http://localhost:8081/api/health
+
+# 预期输出: {"status":"ok","time":1234567890}
+
+# 访问下载页面
+open http://localhost:8081/
+```
+
+## 🌐 配置HTTPS（可选）
+
+### 方法一：使用Cloudflare Tunnel（推荐）
+
+Cloudflare Tunnel提供免费的HTTPS和DDoS保护。
+
+#### 1. 安装cloudflared
+
+**Linux (amd64)**:
+```bash
 wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
 sudo dpkg -i cloudflared-linux-amd64.deb
+```
 
-# Linux (arm64)
+**Linux (arm64)**:
+```bash
 wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64.deb
 sudo dpkg -i cloudflared-linux-arm64.deb
-
-# macOS
-brew install cloudflare/cloudflare/cloudflared
-
-# Docker方式
-docker pull cloudflare/cloudflared
 ```
 
-#### 配置Tunnel
+**macOS**:
 ```bash
-# 方式1: 使用自动化脚本（推荐）
-./scripts/cloudflare-tunnel.sh
+brew install cloudflared
+```
 
-# 方式2: 手动配置
+**Windows**:
+- 下载 [cloudflared-windows-amd64.exe](https://github.com/cloudflare/cloudflared/releases/latest)
+- 重命名为`cloudflared.exe`并添加到PATH
+
+#### 2. 登录Cloudflare
+
+```bash
 cloudflared tunnel login
+```
+
+这会打开浏览器进行授权。
+
+#### 3. 创建隧道
+
+```bash
+# 创建隧道（记录返回的隧道ID）
 cloudflared tunnel create cligool
-cloudflared tunnel route dns <tunnel-id> your-domain.com
-cloudflared tunnel run <tunnel-id>
 ```
 
-#### 后台运行Tunnel
-```bash
-# 使用systemd（推荐）
-sudo cloudflared service install
+#### 4. 配置隧道
 
-# 使用screen
-screen -dmS cloudflared cloudflared tunnel run <tunnel-id>
+创建配置文件 `~/.cloudflared/config.yml`:
 
-# 使用nohup
-nohup cloudflared tunnel run <tunnel-id> > /dev/null 2>&1 &
-```
-
-## 🌐 不同部署场景
-
-### 场景1: 家庭服务器
-
-```bash
-# 在家里的电脑/树莓派上
-cd cligool
-./scripts/deploy.sh
-./scripts/cloudflare-tunnel.sh
-
-# 现在可以从任何地方访问！
-```
-
-### 场景2: 云服务器 (VPS)
-
-```bash
-# 连接到你的VPS
-ssh user@your-vps-ip
-
-# 部署应用
-git clone https://github.com/cligool/cligool.git
-cd cligool
-./scripts/deploy.sh
-
-# 配置Cloudflare Tunnel
-./scripts/cloudflare-tunnel.sh
-```
-
-### 场景3: Kubernetes集群
-
-创建 `k8s-deployment.yaml`:
 ```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: cligool
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: cligool
-  template:
-    metadata:
-      labels:
-        app: cligool
-    spec:
-      containers:
-      - name: relay-server
-        image: cligool:latest
-        ports:
-        - containerPort: 8080
-        env:
-        - name: DATABASE_URL
-          value: "postgres://..."
-        - name: REDIS_URL
-          value: "redis://..."
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: cligool-service
-spec:
-  selector:
-    app: cligool
-  ports:
-  - port: 80
-    targetPort: 8080
+tunnel: <your-tunnel-id>
+credentials-file: /root/.cloudflared/<your-tunnel-id>.json
+
+ingress:
+  - hostname: cligool.yourdomain.com
+    service: http://localhost:8081
+  - service: http_status:404
 ```
 
-部署到Kubernetes:
+#### 5. 启动隧道
+
 ```bash
-kubectl apply -f k8s-deployment.yaml
+# 测试运行
+cloudflared tunnel run
+
+# 或作为系统服务运行
+sudo cloudflared service install
+sudo cloudflared service start
 ```
 
-### 场景4: Docker Swarm
+### 方法二：使用Nginx反向代理
+
+#### 1. 安装Nginx
 
 ```bash
-# 初始化Swarm
-docker swarm init
+# Ubuntu/Debian
+sudo apt install nginx certbot python3-certbot-nginx
 
-# 部署stack
-docker stack deploy -c docker-compose.swarm.yml cligool
+# CentOS/RHEL
+sudo yum install nginx certbot python3-certbot-nginx
 ```
 
-## 🔧 配置选项
+#### 2. 配置Nginx
 
-### 环境变量配置
+创建 `/etc/nginx/sites-available/cligool`:
 
-编辑 `.env` 文件:
+```nginx
+server {
+    listen 80;
+    server_name cligool.yourdomain.com;
+
+    location / {
+        proxy_pass http://localhost:8081;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+#### 3. 启用配置
+
 ```bash
-# 数据库配置
-DATABASE_URL=postgres://cligool:your-password@postgres:5432/cligool
+sudo ln -s /etc/nginx/sites-available/cligool /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+#### 4. 获取SSL证书
+
+```bash
+sudo certbot --nginx -d cligool.yourdomain.com
+```
+
+## 🔧 环境变量配置
+
+创建 `.env` 文件：
+
+```bash
+# PostgreSQL配置
+POSTGRES_DB=cligool
+POSTGRES_USER=cligool
+POSTGRES_PASSWORD=your_secure_password
+
+# 数据库连接URL
+DATABASE_URL=postgres://cligool:your_secure_password@postgres:5432/cligool?sslmode=disable
+
+# Redis配置
 REDIS_URL=redis://redis:6379
 
-# 服务配置
+# 服务器配置
 RELAY_HOST=0.0.0.0
 RELAY_PORT=8080
 
-# JWT密钥 (必须修改！)
-JWT_SECRET=your-super-secret-key-here
-
-# 日志级别
-LOG_LEVEL=info
+# 生产模式
+GIN_MODE=release
 ```
 
-### 性能调优
+## 📊 监控和日志
+
+### 查看日志
 
 ```bash
-# docker-compose.yml
-services:
-  relay-server:
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-        reservations:
-          cpus: '0.5'
-          memory: 256M
+# 查看所有服务日志
+docker-compose logs
+
+# 查看特定服务日志
+docker-compose logs -f relay-server
+
+# 查看最近100行日志
+docker-compose logs --tail=100 relay-server
 ```
 
-### 安全加固
+### 性能监控
 
-1. **使用防火墙**
 ```bash
-# 只允许本地访问
-ufw deny 8080
-```
+# 查看资源使用情况
+docker stats cligool-relay cligool-postgres cligool-redis
 
-2. **配置Cloudflare Access**
-```bash
-# 在Cloudflare Zero Trust控制台
-# Settings -> Zero Trust -> Access
-# 配置认证策略
+# 查看容器详情
+docker inspect cligool-relay
 ```
-
-3. **定期更新**
-```bash
-# 更新镜像
-docker-compose pull
-docker-compose up -d
-```
-
-## 📊 监控和维护
 
 ### 健康检查
-```bash
-# 检查服务状态
-curl http://localhost:8080/api/health
 
-# 检查Docker容器
-docker-compose ps
+```bash
+# API健康检查
+curl http://localhost:8081/api/health
+
+# 数据库连接测试
+docker exec cligool-postgres pg_isready -U cligool
+
+# Redis连接测试
+docker exec cligool-redis redis-cli ping
 ```
 
-### 日志管理
+## 🛠️ 维护操作
+
+### 更新服务
+
 ```bash
-# 查看实时日志
-docker-compose logs -f
+# 1. 拉取最新代码
+git pull origin main
 
-# 查看最近日志
-docker-compose logs --tail=100
-
-# 导出日志
-docker-compose logs > app.log
-```
-
-### 数据备份
-```bash
-# 备份数据库
-docker exec cligool-postgres pg_dump -U cligool cligool > backup.sql
-
-# 备份到云存储
-rclone copy backup.sql your-backup:cligool/
-```
-
-### 服务更新
-```bash
-# 拉取最新代码
-git pull
-
-# 重新构建和部署
-docker-compose down
+# 2. 重新构建镜像
 docker-compose build
+
+# 3. 重启服务
 docker-compose up -d
+
+# 4. 清理旧镜像
+docker image prune -f
 ```
+
+### 备份数据
+
+```bash
+# 备份PostgreSQL数据库
+docker exec cligool-postgres pg_dump -U cligool cligool > backup_$(date +%Y%m%d).sql
+
+# 备份Redis数据
+docker exec cligool-redis redis-cli SAVE
+docker cp cligool-redis:/data/dump.rdb ./redis_backup_$(date +%Y%m%d).rdb
+```
+
+### 恢复数据
+
+```bash
+# 恢复PostgreSQL数据库
+docker exec -i cligool-postgres psql -U cligool cligool < backup_20250101.sql
+
+# 恢复Redis数据
+docker cp ./redis_backup_20250101.rdb cligool-redis:/data/dump.rdb
+docker-compose restart redis
+```
+
+### 清理资源
+
+```bash
+# 停止所有服务
+docker-compose down
+
+# 删除所有数据（谨慎使用）
+docker-compose down -v
+
+# 清理未使用的镜像
+docker image prune -a
+
+# 清理未使用的卷
+docker volume prune
+```
+
+## 🔒 安全建议
+
+1. **更改默认密码**: 修改docker-compose.yml中的数据库密码
+2. **启用HTTPS**: 使用Cloudflare Tunnel或Let's Encrypt
+3. **防火墙配置**: 只开放必要的端口
+4. **定期更新**: 保持Docker和系统更新
+5. **监控日志**: 定期检查异常访问
+6. **备份数据**: 定期备份重要数据
 
 ## 🐛 故障排除
 
-### 常见问题
+### 端口被占用
 
-1. **服务无法启动**
 ```bash
 # 检查端口占用
-netstat -tuln | grep 8080
+sudo lsof -i :8081
 
-# 检查日志
+# 修改docker-compose.yml中的端口映射
+ports:
+  - "8082:8080"  # 改为其他端口
+```
+
+### 内存不足
+
+```bash
+# 增加Docker内存限制（Docker Desktop）
+# Settings > Resources > Memory
+
+# 或减少PostgreSQL内存使用
+# 在docker-compose.yml中添加:
+command: postgres -c shared_buffers=128MB -c max_connections=50
+```
+
+### 容器无法启动
+
+```bash
+# 查看详细日志
 docker-compose logs relay-server
 
-# 重启服务
-docker-compose restart
+# 检查容器状态
+docker ps -a
+
+# 重新创建容器
+docker-compose up -d --force-recreate
 ```
 
-2. **Cloudflare Tunnel连接失败**
-```bash
-# 检查tunnel状态
-cloudflared tunnel info <tunnel-id>
+## 📚 更多文档
 
-# 测试连接
-curl -v http://localhost:8080/api/health
+- [README.md](../README.md) - 项目总览
+- [USAGE_GUIDE_CN.md](../USAGE_GUIDE_CN.md) - 使用指南
+- [DEVELOPMENT.md](DEVELOPMENT.md) - 开发指南
 
-# 重新配置tunnel
-cloudflared tunnel delete <tunnel-id>
-./scripts/cloudflare-tunnel.sh
-```
+## 🤝 获取帮助
 
-3. **数据库连接问题**
-```bash
-# 检查数据库状态
-docker-compose ps postgres
-
-# 进入数据库
-docker exec -it cligool-postgres psql -U cligool cligool
-```
-
-### 日志位置
-- **应用日志**: `docker-compose logs`
-- **数据库日志**: `docker-compose logs postgres`
-- **Cloudflare日志**: `/var/log/cloudflared.log`
-
-## 🚀 生产环境建议
-
-### 高可用部署
-1. 使用多个relay实例
-2. 配置负载均衡
-3. 设置健康检查
-4. 配置自动重启
-
-### 安全建议
-1. 启用Cloudflare Access
-2. 配置速率限制
-3. 定期备份数据
-4. 监控异常访问
-5. 使用强密码
-
-### 性能优化
-1. 调整数据库连接池
-2. 配置Redis持久化
-3. 使用CDN缓存静态资源
-4. 监控资源使用
-5. 定期清理日志
-
-## 📞 获取帮助
-
-- **文档**: [docs/](docs/)
-- **问题报告**: [GitHub Issues](https://github.com/cligool/cligool/issues)
-- **讨论**: [GitHub Discussions](https://github.com/cligool/cligool/discussions)
-
----
-
-*部署成功后，你可以通过Cloudflare配置的域名访问服务！*
+- 提交Issue: https://github.com/topcheer/cligool/issues
+- 查看文档: https://github.com/topcheer/cligool/wiki
