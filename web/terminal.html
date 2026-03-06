@@ -243,8 +243,18 @@
                     ws.send(JSON.stringify({
                         type: 'input',
                         data: data,
-                        session: sessionId
+                        session: sessionId,
+                        source: 'web'
                     }));
+
+                    // 根据客户端操作系统类型决定是否本地回显
+                    // Windows管道模式: 不会自动回显，需要本地回显
+                    // Unix PTY模式: PTY会自动回显，不需要本地回显（避免重复）
+                    if (clientOS === 'windows') {
+                        // Windows: 立即本地回显
+                        terminal.write(data);
+                    }
+                    // Unix: 不本地回显，等待PTY回显
                 }
             });
 
