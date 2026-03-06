@@ -130,7 +130,6 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 			path, err := exec.LookPath(execCmd)
 			if err == nil {
 				command = exec.Command(path)
-				log.Printf("找到命令路径: %s", path)
 			}
 		}
 	} else {
@@ -204,10 +203,8 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
 	if err != nil {
 		log.Printf("警告: 无法设置终端为原始模式: %v", err)
-		log.Printf("输入可能需要按回车后才会发送")
 	} else {
 		defer term.Restore(int(os.Stdin.Fd()), oldState)
-		log.Println("本地终端已设置为原始模式")
 	}
 
 	// 本地终端输入 -> PTY
@@ -224,15 +221,12 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 			}
 
 			data := buf[:n]
-			log.Printf("[DEBUG] 本地输入: %d字节, 数据=%q", n, data)
 
 			// 写入PTY
-			written, err := ptmx.Write(data)
-			if err != nil {
+			if _, err := ptmx.Write(data); err != nil {
 				log.Printf("PTY写入失败（本地输入）: %v", err)
 				continue
 			}
-			log.Printf("[DEBUG] PTY写入成功: %d字节", written)
 
 			// 同时发送到WebSocket，让Web端看到本地输入
 			msg := TerminalMessage{
