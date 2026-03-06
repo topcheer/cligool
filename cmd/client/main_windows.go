@@ -110,10 +110,31 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 	fmt.Println("Windows模式：功能可能受限")
 	fmt.Println()
 
-	// 显示可点击的 Web 终端 URL
+	// 发送系统通知并自动打开浏览器
 	webURL := fmt.Sprintf("%s/session/%s", serverURL, sessionID)
-	fmt.Println("🌐 Web终端访问地址：")
-	fmt.Printf("   %s\n", webURL)
+
+	// Windows: 使用简单的方法打开浏览器
+	go func() {
+		// 方法1: 使用 rundll32 打开 URL
+		cmd := exec.Command("rundll32", "url.dll,FileProtocolHandler", webURL)
+		if err := cmd.Run(); err != nil {
+			// 方法2: 降级到 cmd start
+			exec.Command("cmd", "/c", "start", "", webURL).Run()
+		}
+	}()
+
+	// 可选：显示简单的 Toast 通知（Windows 10+）
+	go func() {
+		// 使用 PowerShell 的 BurntToast 模块（如果可用）
+		psScript := fmt.Sprintf(
+			`try { Import-Module BurntToast; New-BurntToastNotification -Title '🌐 CliGool Web 终端' -Message '%s' } catch {}`,
+			webURL,
+		)
+		exec.Command("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", psScript).Run()
+	}()
+
+	log.Printf("✅ 已在浏览器中打开: %s", webURL)
+	fmt.Println("📱 已发送系统通知并在浏览器中打开 Web 终端")
 	fmt.Println()
 
 	// 创建WebSocket写入channel，确保串行写入
