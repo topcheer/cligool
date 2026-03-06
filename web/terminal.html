@@ -212,6 +212,11 @@
                 },
                 scrollback: 1000,
                 tabStopWidth: 4,
+                // 启用高级终端特性
+                allowProposedApi: true,  // 允许使用实验性 API
+                convertEol: true,         // 自动转换换行符
+                // 终端选项
+                altClickMovesCursor: true, // Alt+点击移动光标
             });
 
             // 加载插件

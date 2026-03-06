@@ -15,7 +15,6 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-	"unicode/utf8"
 
 	"github.com/creack/pty"
 	"github.com/google/uuid"
@@ -131,7 +130,29 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 		log.Printf("使用默认shell: %s", shell)
 		command = exec.Command(shell, "-i", "-l")
 	}
-	command.Env = append(os.Environ(), "TERM=xterm-256color")
+
+	// 设置环境变量以确保终端工具正确工作
+	env := append(os.Environ(),
+		"TERM=xterm-256color",
+		"COLORTERM=truecolor",  // 启用真色支持
+		"FORCE_COLOR=1",         // 强制启用颜色
+	)
+
+	// 确保 LANG/LC_ALL 设置为 UTF-8
+	hasUTF8Locale := false
+	for _, e := range env {
+		if len(e) > 9 && (e[:9] == "LANG=" || e[:9] == "LC_ALL=") {
+			if len(e) > 10 && e[len(e)-5:] == ".UTF-8" {
+				hasUTF8Locale = true
+				break
+			}
+		}
+	}
+	if !hasUTF8Locale {
+		env = append(env, "LANG=en_US.UTF-8", "LC_ALL=en_US.UTF-8")
+	}
+
+	command.Env = env
 
 	// 启动PTY
 	ptmx, err := pty.Start(command)
@@ -229,7 +250,8 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 
 	// PTY -> 本地stdout + WebSocket (PTY输出同时显示在两端)
 	// 使用更小的缓冲区以减少延迟
-	buf := make([]byte, 128) // 从1024减少到128字节以减少延迟
+	buf := make([]byte, 1024)
+	emulator := NewTerminalEmulator()
 	for {
 		n, err := ptmx.Read(buf)
 		if err != nil {
@@ -239,27 +261,32 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 			return fmt.Errorf("PTY读取失败: %w", err)
 		}
 
-		// 确保数据是有效的UTF-8
 		data := buf[:n]
-		if !utf8.Valid(data) {
-			// 跳过无效的UTF-8序列
-			continue
+
+		// 使用终端仿真器处理数据，拦截查询并生成响应
+		output, responses := emulator.Process(data)
+
+		// 输出正常数据
+		if len(output) > 0 {
+			// 1. 显示到本地终端
+			os.Stdout.Write(output)
+
+			// 2. 同时发送到WebSocket
+			msg := TerminalMessage{
+				Type:    "output",
+				Data:    string(output),
+				Session: sessionID,
+				UserID:  "client",
+			}
+
+			jsonData, _ := json.Marshal(msg)
+			wsWriteChan <- jsonData
 		}
 
-		// 1. 显示到本地终端
-		os.Stdout.Write(data)
-
-		// 2. 同时发送到WebSocket
-		msg := TerminalMessage{
-			Type:    "output",
-			Data:    string(data),
-			Session: sessionID,
-			UserID:  "client",
+		// 发送查询响应到 PTY
+		if len(responses) > 0 {
+			ptmx.Write(responses)
 		}
-
-		// 使用WriteMessage而不是WriteJSON以提高性能
-		jsonData, _ := json.Marshal(msg)
-		wsWriteChan <- jsonData
 	}
 }
 

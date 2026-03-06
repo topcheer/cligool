@@ -154,10 +154,18 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 
 	// 创建命令
 	cmd := exec.Command(cmdName)
-	// 使用交互模式以获得完整的终端体验
-	cmd.Env = append(os.Environ(),
+
+	// 设置环境变量以确保终端工具正确工作
+	env := append(os.Environ(),
 		"TERM=xterm-256color",
+		"COLORTERM=truecolor",  // 启用真色支持
+		"FORCE_COLOR=1",         // 强制启用颜色
 	)
+
+	// Windows 上不需要 LANG/LC_ALL，但确保使用 UTF-8 代码页
+	env = append(env, "PYTHONIOENCODING=utf-8")  // Python 工具使用 UTF-8
+
+	cmd.Env = env
 	// 禁用命令行参数处理，保持交互模式
 	cmd.Args = []string{cmdName}
 
