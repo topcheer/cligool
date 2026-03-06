@@ -249,13 +249,13 @@ func buildWebSocketURL(serverURL, sessionID string) (string, error) {
 func setupHeartbeat(conn *websocket.Conn) {
 	// 设置ping handler，自动回复pong
 	conn.SetPingHandler(func(appData string) error {
-		log.Printf("💓 收到服务器ping")
+		// log.Printf("💓 收到服务器ping")
 		return conn.WriteMessage(websocket.PongMessage, []byte(appData))
 	})
 
 	// 设置pong handler
 	conn.SetPongHandler(func(appData string) error {
-		log.Printf("💓 收到服务器pong")
+		// log.Printf("💓 收到服务器pong")
 		return nil
 	})
 
@@ -271,7 +271,7 @@ func setupHeartbeat(conn *websocket.Conn) {
 					log.Printf("❌ 发送ping失败: %v", err)
 					return
 				}
-				log.Printf("💓 发送ping到服务器")
+				// log.Printf("💓 发送ping到服务器")
 			}
 		}
 	}()
