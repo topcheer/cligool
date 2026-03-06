@@ -199,6 +199,10 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 		}
 	}()
 
+	// 创建 URL 通知器（检测到公网 URL 时弹出系统提示）
+	urlNotifier := NewURLNotifier(true)
+	log.Println("URL 通知器已启用")
+
 	// 将本地终端设置为原始模式，以便立即发送每个按键
 	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
 	if err != nil {
@@ -292,7 +296,10 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 			// 1. 显示到本地终端
 			os.Stdout.Write(output)
 
-			// 2. 同时发送到WebSocket
+			// 2. 检测并发送 URL 通知
+			urlNotifier.Process(output)
+
+			// 3. 同时发送到WebSocket
 			msg := TerminalMessage{
 				Type:    "output",
 				Data:    string(output),
