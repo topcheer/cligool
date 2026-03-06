@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -121,6 +122,16 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 		// 直接执行指定的命令
 		log.Printf("直接执行命令: %s", execCmd)
 		command = exec.Command(execCmd)
+
+		// 确保命令在PATH中能找到
+		if filepath.Base(execCmd) == execCmd {
+			// 如果只给了命令名，没有路径，查找完整路径
+			path, err := exec.LookPath(execCmd)
+			if err == nil {
+				command = exec.Command(path)
+				log.Printf("找到命令路径: %s", path)
+			}
+		}
 	} else {
 		// 使用默认 shell
 		shell := os.Getenv("SHELL")
@@ -201,16 +212,21 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 				continue
 			}
 
+			data := buf[:n]
+			log.Printf("[DEBUG] 本地输入: %d字节, 数据=%q", n, data)
+
 			// 写入PTY
-			if _, err := ptmx.Write(buf[:n]); err != nil {
+			written, err := ptmx.Write(data)
+			if err != nil {
 				log.Printf("PTY写入失败（本地输入）: %v", err)
 				continue
 			}
+			log.Printf("[DEBUG] PTY写入成功: %d字节", written)
 
 			// 同时发送到WebSocket，让Web端看到本地输入
 			msg := TerminalMessage{
 				Type:    "input",
-				Data:    string(buf[:n]),
+				Data:    string(data),
 				Session: sessionID,
 				UserID:  "client",
 				Source:  "local",
