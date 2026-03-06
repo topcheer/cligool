@@ -53,9 +53,13 @@ func main() {
 	// 静态JavaScript和CSS库
 	router.Static("/lib", "./web/lib")
 
+	// 下载文件目录
+	router.Static("/downloads", "./web/downloads")
+
+	// 首页 - 着陆页面（包含下载链接）
 	router.GET("/", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "index.html", gin.H{
-			"title": "CliGool - 远程终端",
+		c.HTML(http.StatusOK, "landing.html", gin.H{
+			"title": "CliGool - 跨平台远程终端",
 		})
 	})
 

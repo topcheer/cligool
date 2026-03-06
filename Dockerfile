@@ -4,7 +4,7 @@ FROM golang:1.21-alpine AS builder
 WORKDIR /app
 
 # 安装依赖
-RUN apk add --no-cache git make
+RUN apk add --no-cache git make zip
 
 # 复制go mod文件
 COPY go.mod go.sum ./
@@ -15,6 +15,22 @@ COPY . .
 
 # 构建中继服务器
 RUN CGO_ENABLED=0 GOOS=linux go build -o relay-server ./cmd/relay
+
+# 构建所有平台的客户端
+RUN mkdir -p web/downloads
+
+# Windows版本
+RUN CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o web/downloads/cligool-windows-amd64.exe ./cmd/client && \
+    cd web/downloads && zip cligool-windows-amd64.zip cligool-windows-amd64.exe && rm -f cligool-windows-amd64.exe && cd /app
+
+# Linux版本
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o web/downloads/cligool-linux-amd64 ./cmd/client
+
+# macOS版本 (amd64)
+RUN CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o web/downloads/cligool-darwin-amd64 ./cmd/client
+
+# macOS版本 (arm64)
+RUN CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o web/downloads/cligool-darwin-arm64 ./cmd/client
 
 # 最终镜像
 FROM alpine:latest

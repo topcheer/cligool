@@ -107,4 +107,5 @@ AUTO_MEMORY.md
 MEMORY.md
 
 # 会话文件
-*.session
+*.session# 下载文件（在Docker构建时生成）
+web/downloads/
