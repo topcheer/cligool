@@ -52,8 +52,8 @@ func main() {
 
 	serverURL := flag.String("server", "https://cligool.zty8.cn", "中继服务器URL")
 	sessionID := flag.String("session", "", "会话ID")
-	cols := flag.Int("cols", 80, "终端列数")
-	rows := flag.Int("rows", 24, "终端行数")
+	cols := flag.Int("cols", 120, "终端列数")
+	rows := flag.Int("rows", 36, "终端行数")
 	execCmd := flag.String("cmd", "", "直接执行的命令（如 claude, gemini 等）")
 	flag.Parse()
 
