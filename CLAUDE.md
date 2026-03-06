@@ -73,8 +73,8 @@ docker-compose ps
 ### Windows客户端 (`main_windows.go`)
 
 - 使用`cmd.exe`管道，不是PTY
-- **必须进行GBK→UTF-8编码转换**：cmd.exe输出GBK编码，WebSocket需要UTF-8
-- 本地终端显示原始GBK数据（中文可能有乱码），Web端显示转换后的UTF-8
+- **必须进行GBK→UTF-8编码转换**：cmd.exe输出GBK编码，需要转换为UTF-8
+- **本地终端和Web终端都显示UTF-8编码**（先转换后输出，避免本地乱码）
 - 换行符处理：`\r` → `\r\n`
 
 ### Unix客户端 (`main_unix.go`)
@@ -173,14 +173,35 @@ Web端user_id使用时间戳确保每次连接唯一。
 
 ## 常见问题
 
-### 问题：Windows客户端CLI无输出
+### 问题：Windows客户端CLI无输出或乱码
 
-**原因**：可能在修改时删除了`os.Stdout.Write(data)`
+**无输出原因**：可能在修改时删除了`os.Stdout.Write(data)`
 
-**解决**：在stdout读取循环中确保有本地输出：
+**乱码原因**：直接写入GBK编码数据到本地终端，需要先转换为UTF-8
+
+**解决**：在stdout/stderr读取循环中先转换GBK到UTF-8，再输出到本地终端：
 ```go
 // main_windows.go, stdout读取循环
-os.Stdout.Write(data) // 本地终端输出
+data := buf[:n]
+
+// 转换为UTF-8
+converted, err := convertGBKToUTF8(data)
+if err != nil {
+    converted = string(data)
+}
+
+// 显示到本地终端（UTF-8数据）
+os.Stdout.Write([]byte(converted))
+
+// 同时发送UTF-8到WebSocket
+msg := TerminalMessage{
+    Type: "output",
+    Data: converted,
+    Session: sessionID,
+    UserID: "client",
+}
+jsonData, _ := json.Marshal(msg)
+wsWriteChan <- jsonData
 ```
 
 ### 问题：WebSocket并发写入panic
