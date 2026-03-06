@@ -20,6 +20,7 @@ import (
 	"github.com/creack/pty"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"golang.org/x/term"
 )
 
 type TerminalMessage struct {
@@ -198,6 +199,16 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 			handleResize()
 		}
 	}()
+
+	// 将本地终端设置为原始模式，以便立即发送每个按键
+	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
+	if err != nil {
+		log.Printf("警告: 无法设置终端为原始模式: %v", err)
+		log.Printf("输入可能需要按回车后才会发送")
+	} else {
+		defer term.Restore(int(os.Stdin.Fd()), oldState)
+		log.Println("本地终端已设置为原始模式")
+	}
 
 	// 本地终端输入 -> PTY
 	go func() {
