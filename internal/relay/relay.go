@@ -125,6 +125,7 @@ func (s *Service) HandleTerminalConnection(c *gin.Context) {
 // handleClientConnection 处理CLI客户端连接
 func (s *Service) handleClientConnection(session *Session) {
 	conn := session.ClientCon
+	log.Printf("🖥️  开始处理CLI客户端连接")
 
 	for {
 		var msg TerminalMessage
@@ -133,6 +134,9 @@ func (s *Service) handleClientConnection(session *Session) {
 			log.Printf("Client connection error: %v", err)
 			break
 		}
+
+		log.Printf("📨 收到CLI消息: type=%s, data_len=%d, session=%s",
+			msg.Type, len(msg.Data), msg.Session)
 
 		// 广播消息给所有Web客户端
 		s.broadcastToWebClients(session, msg)
@@ -148,6 +152,7 @@ func (s *Service) handleClientConnection(session *Session) {
 // handleWebClient 处理Web客户端连接
 func (s *Service) handleWebClient(session *Session, userID string) {
 	conn := session.Clients[userID]
+	log.Printf("🌐 开始处理Web客户端: %s", userID)
 
 	for {
 		var msg TerminalMessage
@@ -157,15 +162,23 @@ func (s *Service) handleWebClient(session *Session, userID string) {
 			break
 		}
 
+		log.Printf("📨 收到Web消息: type=%s, data_len=%d, session=%s",
+			msg.Type, len(msg.Data), msg.Session)
+
 		// 转发消息到CLI客户端
 		session.Mutex.RLock()
 		if session.ClientCon != nil {
 			err := session.ClientCon.WriteJSON(msg)
+			session.Mutex.RUnlock()
 			if err != nil {
 				log.Printf("Failed to send message to client: %v", err)
+			} else {
+				log.Printf("✅ 消息已转发到CLI客户端")
 			}
+		} else {
+			session.Mutex.RUnlock()
+			log.Printf("⚠️  CLI客户端未连接，消息丢弃")
 		}
-		session.Mutex.RUnlock()
 	}
 
 	// 清理连接
@@ -179,10 +192,16 @@ func (s *Service) broadcastToWebClients(session *Session, msg TerminalMessage) {
 	session.Mutex.RLock()
 	defer session.Mutex.RUnlock()
 
+	webClientCount := len(session.Clients)
+	log.Printf("📡 广播消息到 %d 个Web客户端: type=%s, data_len=%d",
+		webClientCount, msg.Type, len(msg.Data))
+
 	for userID, conn := range session.Clients {
 		err := conn.WriteJSON(msg)
 		if err != nil {
 			log.Printf("Failed to send message to web client %s: %v", userID, err)
+		} else {
+			log.Printf("✅ 消息已发送到Web客户端: %s", userID)
 		}
 	}
 }

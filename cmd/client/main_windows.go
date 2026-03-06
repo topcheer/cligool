@@ -99,6 +99,8 @@ func runTerminalSession(serverURL, sessionID string) error {
 	}
 	defer cmd.Process.Kill()
 
+	log.Println("✅ Windows命令行已启动")
+
 	// WebSocket -> Stdin (网页输入写入命令)
 	go func() {
 		for {
@@ -110,55 +112,63 @@ func runTerminalSession(serverURL, sessionID string) error {
 
 			var msg TerminalMessage
 			if err := json.Unmarshal(message, &msg); err != nil {
+				log.Printf("JSON解析失败: %v", err)
 				continue
 			}
 
 			if msg.Type == "input" && msg.Data != "" {
-				stdin.Write([]byte(msg.Data))
+				log.Printf("📥 收到输入: %q", msg.Data)
+				if _, err := stdin.Write([]byte(msg.Data)); err != nil {
+					log.Printf("写入stdin失败: %v", err)
+				}
 			}
 		}
 	}()
 
-	// 合并stdout和stderr
+	// 同时读取stdout和stderr
 	go func() {
-		io.Copy(stdin, stdout)
+		buf := make([]byte, 128)
+		for {
+			n, err := stderr.Read(buf)
+			if err != nil {
+				if err != io.EOF {
+					log.Printf("stderr读取失败: %v", err)
+				}
+				return
+			}
+
+			data := buf[:n]
+			if !utf8.Valid(data) {
+				continue
+			}
+
+			msg := TerminalMessage{
+				Type:    "output",
+				Data:    string(data),
+				Session: sessionID,
+				UserID:  "client",
+			}
+
+			jsonData, _ := json.Marshal(msg)
+			if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
+				log.Printf("WebSocket写入失败(stderr): %v", err)
+				return
+			}
+		}
 	}()
 
-	// Stdout/Stderr -> WebSocket (命令输出发送到网页)
+	// Stdout -> WebSocket (命令输出发送到网页)
 	buf := make([]byte, 128)
 	for {
 		n, err := stdout.Read(buf)
 		if err != nil {
 			if err == io.EOF {
-				// 尝试读取stderr
-				n, err := stderr.Read(buf)
-				if err == io.EOF {
-					return nil
-				}
-				if err != nil {
-					return fmt.Errorf("stderr读取失败: %w", err)
-				}
-
-				data := buf[:n]
-				if !utf8.Valid(data) {
-					continue
-				}
-
-				msg := TerminalMessage{
-					Type:    "output",
-					Data:    string(data),
-					Session: sessionID,
-					UserID:  "client",
-				}
-
-				jsonData, _ := json.Marshal(msg)
-				if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
-					return fmt.Errorf("WebSocket写入失败: %w", err)
-				}
-				continue
+				return nil
 			}
 			return fmt.Errorf("stdout读取失败: %w", err)
 		}
+
+		log.Printf("📤 从stdout读取 %d 字节", n)
 
 		// 确保数据是有效的UTF-8
 		data := buf[:n]
@@ -178,6 +188,8 @@ func runTerminalSession(serverURL, sessionID string) error {
 		if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
 			return fmt.Errorf("WebSocket写入失败: %w", err)
 		}
+
+		log.Printf("✅ 已发送 %d 字节到WebSocket", n)
 	}
 }
 
