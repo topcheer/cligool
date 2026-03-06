@@ -28,7 +28,33 @@ build-relay:
 build-client:
 	@echo "构建CLI客户端..."
 	mkdir -p bin
-	CGO_ENABLED=0 go build -o bin/cligool-client ./cmd/client
+	CGO_ENABLED=0 go build -o bin/cligool ./cmd/client
+
+# 构建跨平台版本
+build-all-platforms:
+	@echo "构建所有平台版本..."
+	@./build-windows.sh
+
+# 构建Windows版本
+build-windows:
+	@echo "构建Windows版本..."
+	mkdir -p bin
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o bin/cligool.exe ./cmd/client
+	@echo "Windows版本构建完成: bin/cligool.exe"
+
+# 构建Linux版本
+build-linux:
+	@echo "构建Linux版本..."
+	mkdir -p bin
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bin/cligool-linux ./cmd/client
+	@echo "Linux版本构建完成: bin/cligool-linux"
+
+# 构建macOS版本
+build-macos:
+	@echo "构建macOS版本..."
+	mkdir -p bin
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o bin/cligool-macos ./cmd/client
+	@echo "macOS版本构建完成: bin/cligool-macos"
 
 # 运行中继服务器
 run-relay: build-relay
@@ -100,15 +126,24 @@ help:
 	@echo "CliGool 构建系统"
 	@echo ""
 	@echo "使用方法:"
-	@echo "  make build        - 构建所有组件"
-	@echo "  make build-relay  - 构建中继服务器"
-	@echo "  make build-client - 构建CLI客户端"
-	@echo "  make run-relay    - 运行中继服务器"
-	@echo "  make run-client   - 运行CLI客户端"
-	@echo "  make test         - 运行测试"
-	@echo "  make clean        - 清理构建文件"
-	@echo "  make docker-build - 构建Docker镜像"
-	@echo "  make docker-up    - 启动Docker服务"
-	@echo "  make docker-down  - 停止Docker服务"
-	@echo "  make dev          - 启动开发环境"
-	@echo "  make gen-certs    - 生成SSL证书"
+	@echo "  make build              - 构建所有组件"
+	@echo "  make build-relay        - 构建中继服务器"
+	@echo "  make build-client       - 构建CLI客户端"
+	@echo "  make build-all-platforms - 构建所有平台版本"
+	@echo "  make build-windows      - 构建Windows版本"
+	@echo "  make build-linux        - 构建Linux版本"
+	@echo "  make build-macos        - 构建macOS版本"
+	@echo "  make run-relay          - 运行中继服务器"
+	@echo "  make run-client         - 运行CLI客户端"
+	@echo "  make test               - 运行测试"
+	@echo "  make clean              - 清理构建文件"
+	@echo "  make docker-build       - 构建Docker镜像"
+	@echo "  make docker-up          - 启动Docker服务"
+	@echo "  make docker-down        - 停止Docker服务"
+	@echo "  make dev                - 启动开发环境"
+	@echo "  make gen-certs          - 生成SSL证书"
+	@echo ""
+	@echo "平台支持:"
+	@echo "  ✅ Windows   - 完全支持（有限功能）"
+	@echo "  ✅ Linux     - 完全支持（所有功能）"
+	@echo "  ✅ macOS     - 完全支持（所有功能）"
