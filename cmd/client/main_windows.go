@@ -33,7 +33,7 @@ type TerminalMessage struct {
 }
 
 func main() {
-	log.Println("🚀 CliGool Windows客户端启动...")
+	log.Println("CliGool Windows客户端启动...")
 
 	serverURL := flag.String("server", "https://cligool.zty8.cn", "中继服务器URL")
 	sessionID := flag.String("session", "", "会话ID")
@@ -44,16 +44,16 @@ func main() {
 		sid = uuid.New().String()
 	}
 
-	log.Println("📋 会话ID:", sid)
+	log.Println("会话ID:", sid)
 
 	// 显示连接信息
 	printHeader(sid, *serverURL)
 
-	log.Println("🔗 开始连接WebSocket...")
+	log.Println("开始连接WebSocket...")
 
 	// 启动WebSocket并运行终端会话
 	if err := runTerminalSession(*serverURL, sid); err != nil {
-		log.Printf("❌ 终端会话失败: %v", err)
+		log.Printf("终端会话失败: %v", err)
 		fmt.Printf("连接失败: %v\n", err)
 		os.Exit(1)
 	}
@@ -61,24 +61,24 @@ func main() {
 
 func printHeader(sessionID, serverURL string) {
 	fmt.Println("╔═══════════════════════════════════════════════════════════╗")
-	fmt.Println("║                    🚀 CliGool 远程终端                      ║")
+	fmt.Println("║                    CliGool 远程终端                        ║")
 	fmt.Println("╠═══════════════════════════════════════════════════════════╣")
-	fmt.Printf("║ 📋 会话ID: %-43s ║\n", sessionID)
-	fmt.Printf("║ 🌐 Web访问: %-43s ║\n", serverURL+"/session/"+sessionID)
-	fmt.Printf("║ 🔗 连接状态: %-43s ║\n", "🟡 连接中...")
+	fmt.Printf("║ 会话ID: %-48s ║\n", sessionID)
+	fmt.Printf("║ Web访问: %-48s ║\n", serverURL+"/session/"+sessionID)
+	fmt.Printf("║ 连接状态: %-48s ║\n", "连接中...")
 	fmt.Println("╚═══════════════════════════════════════════════════════════╝")
 	fmt.Println()
 }
 
 func runTerminalSession(serverURL, sessionID string) error {
-	log.Println("🔧 开始建立WebSocket连接...")
+	log.Println("开始建立WebSocket连接...")
 
 	// 建立 WebSocket 连接
 	wsURL, _ := buildWebSocketURL(serverURL, sessionID)
 	dialer := websocket.DefaultDialer
 	dialer.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 
-	log.Println("📡 WebSocket URL:", wsURL)
+	log.Println("WebSocket URL:", wsURL)
 
 	conn, _, err := dialer.Dial(wsURL, nil)
 	if err != nil {
@@ -86,10 +86,10 @@ func runTerminalSession(serverURL, sessionID string) error {
 	}
 	defer conn.Close()
 
-	log.Println("✅ WebSocket已连接")
-	fmt.Println("✅ 已连接到中继服务器")
-	fmt.Println("💡 现在可以在Web终端中输入命令了")
-	fmt.Println("⚠️  Windows模式：功能可能受限")
+	log.Println("WebSocket已连接")
+	fmt.Println("已连接到中继服务器")
+	fmt.Println("现在可以在Web终端中输入命令了")
+	fmt.Println("Windows模式：功能可能受限")
 	fmt.Println()
 
 	// 创建WebSocket写入channel，确保串行写入
@@ -99,7 +99,7 @@ func runTerminalSession(serverURL, sessionID string) error {
 	go func() {
 		for data := range wsWriteChan {
 			if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
-				log.Printf("❌ WebSocket写入失败: %v", err)
+				log.Printf("WebSocket写入失败: %v", err)
 				return
 			}
 		}
@@ -120,9 +120,9 @@ func runTerminalSession(serverURL, sessionID string) error {
 	}
 	jsonData, _ := json.Marshal(initMsg)
 	wsWriteChan <- jsonData
-	log.Printf("✅ 已发送初始化消息: 工作目录=%s", wd)
+	log.Printf("已发送初始化消息: 工作目录=%s", wd)
 
-	log.Println("🔧 准备启动cmd.exe...")
+	log.Println("准备启动cmd.exe...")
 
 	// Windows上使用cmd.exe而不是PTY
 	cmd := exec.Command("cmd.exe")
@@ -134,14 +134,14 @@ func runTerminalSession(serverURL, sessionID string) error {
 	// 禁用命令行参数处理，保持交互模式
 	cmd.Args = []string{"cmd.exe"}
 
-	log.Println("📝 创建输入管道...")
+	log.Println("创建输入管道...")
 	// 创建输入输出管道
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return fmt.Errorf("创建stdin管道失败: %w", err)
 	}
 
-	log.Println("📝 创建输出管道...")
+	log.Println("创建输出管道...")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("创建stdout管道失败: %w", err)
@@ -152,15 +152,15 @@ func runTerminalSession(serverURL, sessionID string) error {
 		return fmt.Errorf("创建stderr管道失败: %w", err)
 	}
 
-	log.Println("🚀 启动cmd.exe进程...")
+	log.Println("启动cmd.exe进程...")
 	// 启动命令
 	if err := cmd.Start(); err != nil {
-		log.Printf("❌ cmd.exe启动失败: %v", err)
+		log.Printf("cmd.exe启动失败: %v", err)
 		return fmt.Errorf("启动命令失败: %w", err)
 	}
 	defer cmd.Process.Kill()
 
-	log.Println("✅ cmd.exe已启动，PID:", cmd.Process.Pid)
+	log.Println("cmd.exe已启动，PID:", cmd.Process.Pid)
 
 	// 使用带缓冲的写入器并确保每次写入都flush
 	stdinWriter := bufio.NewWriter(stdin)
@@ -181,12 +181,12 @@ func runTerminalSession(serverURL, sessionID string) error {
 			// 写入cmd.exe
 			_, writeErr := stdinWriter.Write(buf[:n])
 			if writeErr != nil {
-				log.Printf("❌ 写入stdin失败（本地输入）: %v", writeErr)
+				log.Printf("写入stdin失败（本地输入）: %v", writeErr)
 				continue
 			}
 
 			if err := stdinWriter.Flush(); err != nil {
-				log.Printf("❌ Flush失败（本地输入）: %v", err)
+				log.Printf("Flush失败（本地输入）: %v", err)
 			}
 
 			// 同时发送到WebSocket，让Web端看到本地输入
@@ -227,11 +227,11 @@ func runTerminalSession(serverURL, sessionID string) error {
 
 				_, err := stdinWriter.Write(data)
 				if err != nil {
-					log.Printf("❌ 写入stdin失败: %v", err)
+					log.Printf("写入stdin失败: %v", err)
 				} else {
 					// 立即flush确保cmd.exe收到输入
 					if err := stdinWriter.Flush(); err != nil {
-						log.Printf("❌ Flush失败: %v", err)
+						log.Printf("Flush失败: %v", err)
 					}
 				}
 			}
@@ -363,10 +363,9 @@ func setupHeartbeat(conn *websocket.Conn) {
 			select {
 			case <-ticker.C:
 				if err := conn.WriteMessage(websocket.PingMessage, []byte("heartbeat")); err != nil {
-					log.Printf("❌ 发送ping失败: %v", err)
+					log.Printf("发送ping失败: %v", err)
 					return
 				}
-				// log.Printf("💓 发送ping到服务器")
 			}
 		}
 	}()
