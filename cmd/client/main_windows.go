@@ -204,10 +204,7 @@ func runTerminalSession(serverURL, sessionID string) error {
 				log.Printf("Flush失败（本地输入）: %v", err)
 			}
 
-			// 本地回显输入字符（Windows管道模式不会自动回显）
-			os.Stdout.Write(data)
-
-			// 同时发送到WebSocket，让Web端看到本地输入
+			// 发送到WebSocket，让Web端看到本地输入
 			msg := TerminalMessage{
 				Type:    "input",
 				Data:    string(data),
