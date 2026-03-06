@@ -156,6 +156,7 @@
         let fitAddon = null;
         let webglAddon = null;
         let ws = null;
+        let clientOS = 'unknown'; // 客户端操作系统类型
 
         // 从URL获取会话ID
         const pathParts = window.location.pathname.split('/');
@@ -275,6 +276,7 @@
                 ws.onopen = () => {
                     terminal.writeln('✅ WebSocket连接已建立');
                     updateConnectionStatus('connected');
+                    // 不在这里发送回车，等待init消息后再发送
                 };
 
                 ws.onmessage = (event) => {
@@ -308,6 +310,25 @@
 
         function handleTerminalMessage(msg) {
             switch (msg.type) {
+                case 'init':
+                    // 记录客户端操作系统类型
+                    clientOS = msg.os_info || 'unknown';
+                    console.log('💻 检测到客户端系统:', clientOS);
+
+                    // 初始化消息，显示欢迎信息和提示符
+                    terminal.writeln('\x1b[32m✅ CliGool 远程终端已连接\x1b[0m');
+                    terminal.writeln('');
+                    terminal.writeln(`\x1b[36m工作目录:\x1b[0m ${msg.working_dir || 'unknown'}`);
+                    terminal.writeln(`\x1b[36m系统类型:\x1b[0m ${msg.os_info || 'unknown'}`);
+                    terminal.writeln('');
+                    terminal.writeln('\x1b[1m💡 现在可以输入命令了\x1b[0m');
+                    terminal.writeln('');
+
+                    // 发送回车符显示提示符（根据系统类型使用正确的换行符）
+                    setTimeout(() => {
+                        sendEnterKey();
+                    }, 500);
+                    break;
                 case 'output':
                     if (msg.data && msg.data.length > 0) {
                         terminal.write(msg.data);
@@ -322,6 +343,28 @@
                     // 心跳消息，忽略
                     break;
             }
+        }
+
+        function sendEnterKey() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                return;
+            }
+
+            // 根据客户端操作系统类型选择正确的换行符
+            let enterKey = '\r'; // 默认使用CR（Unix）
+            if (clientOS === 'windows') {
+                enterKey = '\r\n'; // Windows使用CRLF
+            }
+
+            const enterMsg = {
+                type: 'input',
+                data: enterKey,
+                session: sessionId,
+                user_id: 'web'
+            };
+
+            ws.send(JSON.stringify(enterMsg));
+            console.log(`📤 发送初始回车符 (${clientOS}):`, JSON.stringify(enterKey));
         }
 
         function disconnect() {

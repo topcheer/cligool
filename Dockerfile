@@ -23,8 +23,13 @@ RUN mkdir -p web/downloads
 RUN CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o web/downloads/cligool-windows-amd64.exe ./cmd/client && \
     cd web/downloads && zip cligool-windows-amd64.zip cligool-windows-amd64.exe && rm -f cligool-windows-amd64.exe && cd /app
 
+RUN CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -o web/downloads/cligool-windows-arm64.exe ./cmd/client && \
+    cd web/downloads && zip cligool-windows-arm64.zip cligool-windows-arm64.exe && rm -f cligool-windows-arm64.exe && cd /app
+
 # Linux版本
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o web/downloads/cligool-linux-amd64 ./cmd/client
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o web/downloads/cligool-linux-arm64 ./cmd/client
 
 # macOS版本 (amd64)
 RUN CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o web/downloads/cligool-darwin-amd64 ./cmd/client

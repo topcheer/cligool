@@ -3,6 +3,8 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"flag"
@@ -12,17 +14,21 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"unicode/utf8"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
 )
 
 type TerminalMessage struct {
-	Type    string `json:"type"`
-	Data    string `json:"data"`
-	Session string `json:"session"`
-	UserID  string `json:"user_id"`
+	Type        string `json:"type"`
+	Data        string `json:"data"`
+	Session     string `json:"session"`
+	UserID      string `json:"user_id"`
+	WorkingDir  string `json:"working_dir,omitempty"`
+	OSInfo      string `json:"os_info,omitempty"`
 }
 
 func main() {
@@ -85,11 +91,36 @@ func runTerminalSession(serverURL, sessionID string) error {
 	fmt.Println("⚠️  Windows模式：功能可能受限")
 	fmt.Println()
 
+	// 设置ping handler和心跳
+	setupHeartbeat(conn)
+
+	// 发送初始化消息（工作目录和系统信息）
+	wd, _ := os.Getwd()
+	initMsg := TerminalMessage{
+		Type:        "init",
+		Session:     sessionID,
+		UserID:      "client",
+		WorkingDir:  wd,
+		OSInfo:      "windows",
+	}
+	jsonData, _ := json.Marshal(initMsg)
+	if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
+		log.Printf("❌ 发送初始化消息失败: %v", err)
+	} else {
+		log.Printf("✅ 已发送初始化消息: 工作目录=%s", wd)
+	}
+
 	log.Println("🔧 准备启动cmd.exe...")
 
 	// Windows上使用cmd.exe而不是PTY
 	cmd := exec.Command("cmd.exe")
-	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
+	// 使用交互模式以获得完整的终端体验
+	cmd.Env = append(os.Environ(),
+		"TERM=xterm-256color",
+		"CMD_QUIT=exit", // 退出命令
+	)
+	// 禁用命令行参数处理，保持交互模式
+	cmd.Args = []string{"cmd.exe"}
 
 	log.Println("📝 创建输入管道...")
 	// 创建输入输出管道
@@ -119,6 +150,9 @@ func runTerminalSession(serverURL, sessionID string) error {
 
 	log.Println("✅ cmd.exe已启动，PID:", cmd.Process.Pid)
 
+	// 使用带缓冲的写入器并确保每次写入都flush
+	stdinWriter := bufio.NewWriter(stdin)
+
 	// WebSocket -> Stdin (网页输入写入命令)
 	go func() {
 		for {
@@ -135,9 +169,33 @@ func runTerminalSession(serverURL, sessionID string) error {
 			}
 
 			if msg.Type == "input" && msg.Data != "" {
-				log.Printf("📥 收到输入: %q", msg.Data)
-				if _, err := stdin.Write([]byte(msg.Data)); err != nil {
-					log.Printf("写入stdin失败: %v", err)
+				log.Printf("📥 收到输入: %q (长度: %d)", msg.Data, len(msg.Data))
+
+				// Windows cmd.exe需要CRLF换行符
+				data := []byte(msg.Data)
+				// 将单独的"\r"转换为"\r\n" (Windows标准换行符)
+				isCommandEnd := false
+				if msg.Data == "\r" {
+					data = []byte("\r\n")
+					isCommandEnd = true
+					log.Printf("🔄 转换: \\r → \\r\\n (Windows CRLF)")
+				}
+
+				written, err := stdinWriter.Write(data)
+				if err != nil {
+					log.Printf("❌ 写入stdin失败: %v", err)
+				} else {
+					log.Printf("✅ 已写入 %d 字节到stdin (缓冲)", written)
+					// 立即flush确保cmd.exe收到输入
+					if err := stdinWriter.Flush(); err != nil {
+						log.Printf("❌ Flush失败: %v", err)
+					} else {
+						log.Printf("✅ 已flush输入缓冲区")
+						// 如果是命令结束（回车），主动触发输出读取
+						if isCommandEnd {
+							log.Printf("🔔 命令结束，触发输出读取")
+						}
+					}
 				}
 			}
 		}
@@ -145,7 +203,8 @@ func runTerminalSession(serverURL, sessionID string) error {
 
 	// 同时读取stdout和stderr
 	go func() {
-		buf := make([]byte, 128)
+		// 使用更大的缓冲区
+		buf := make([]byte, 4096)
 		for {
 			n, err := stderr.Read(buf)
 			if err != nil {
@@ -156,13 +215,16 @@ func runTerminalSession(serverURL, sessionID string) error {
 			}
 
 			data := buf[:n]
-			if !utf8.Valid(data) {
-				continue
+			// Windows cmd.exe使用GBK编码，需要转换为UTF-8
+			converted, err := convertGBKToUTF8(data)
+			if err != nil {
+				// 如果转换失败，使用原始数据
+				converted = string(data)
 			}
 
 			msg := TerminalMessage{
 				Type:    "output",
-				Data:    string(data),
+				Data:    converted,
 				Session: sessionID,
 				UserID:  "client",
 			}
@@ -176,7 +238,8 @@ func runTerminalSession(serverURL, sessionID string) error {
 	}()
 
 	// Stdout -> WebSocket (命令输出发送到网页)
-	buf := make([]byte, 128)
+	// 使用更大的缓冲区以处理cmd.exe的大量输出
+	buf := make([]byte, 4096)
 	for {
 		n, err := stdout.Read(buf)
 		if err != nil {
@@ -188,16 +251,19 @@ func runTerminalSession(serverURL, sessionID string) error {
 
 		log.Printf("📤 从stdout读取 %d 字节", n)
 
-		// 确保数据是有效的UTF-8
+		// Windows cmd.exe使用GBK编码，需要转换为UTF-8
 		data := buf[:n]
-		if !utf8.Valid(data) {
-			continue
+		converted, err := convertGBKToUTF8(data)
+		if err != nil {
+			// 如果转换失败，使用原始数据
+			log.Printf("⚠️  GBK转换失败: %v，使用原始数据", err)
+			converted = string(data)
 		}
 
 		// 发送到WebSocket
 		msg := TerminalMessage{
 			Type:    "output",
-			Data:    string(data),
+			Data:    converted,
 			Session: sessionID,
 			UserID:  "client",
 		}
@@ -207,8 +273,19 @@ func runTerminalSession(serverURL, sessionID string) error {
 			return fmt.Errorf("WebSocket写入失败: %w", err)
 		}
 
-		log.Printf("✅ 已发送 %d 字节到WebSocket", n)
+		log.Printf("✅ 已发送 %d 字节到WebSocket", len(converted))
 	}
+}
+
+// convertGBKToUTF8 将GBK编码的字节转换为UTF-8字符串
+func convertGBKToUTF8(data []byte) (string, error) {
+	// 使用简体中文GBK编码
+	reader := transform.NewReader(bytes.NewReader(data), simplifiedchinese.GBK.NewDecoder())
+	converted, err := io.ReadAll(reader)
+	if err != nil {
+		return "", err
+	}
+	return string(converted), nil
 }
 
 func buildWebSocketURL(serverURL, sessionID string) (string, error) {
@@ -225,4 +302,36 @@ func buildWebSocketURL(serverURL, sessionID string) (string, error) {
 	wsURL := fmt.Sprintf("%s://%s/api/terminal/%s?type=client&user_id=client",
 		scheme, parsedURL.Host, sessionID)
 	return wsURL, nil
+}
+
+// setupHeartbeat 设置心跳机制
+func setupHeartbeat(conn *websocket.Conn) {
+	// 设置ping handler，自动回复pong
+	conn.SetPingHandler(func(appData string) error {
+		log.Printf("💓 收到服务器ping")
+		return conn.WriteMessage(websocket.PongMessage, []byte(appData))
+	})
+
+	// 设置pong handler
+	conn.SetPongHandler(func(appData string) error {
+		log.Printf("💓 收到服务器pong")
+		return nil
+	})
+
+	// 定期发送ping
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				if err := conn.WriteMessage(websocket.PingMessage, []byte("heartbeat")); err != nil {
+					log.Printf("❌ 发送ping失败: %v", err)
+					return
+				}
+				log.Printf("💓 发送ping到服务器")
+			}
+		}
+	}()
 }

@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"syscall"
+	"time"
 	"unicode/utf8"
 
 	"github.com/creack/pty"
@@ -22,10 +23,12 @@ import (
 )
 
 type TerminalMessage struct {
-	Type    string `json:"type"`
-	Data    string `json:"data"`
-	Session string `json:"session"`
-	UserID  string `json:"user_id"`
+	Type        string `json:"type"`
+	Data        string `json:"data"`
+	Session     string `json:"session"`
+	UserID      string `json:"user_id"`
+	WorkingDir  string `json:"working_dir,omitempty"`
+	OSInfo      string `json:"os_info,omitempty"`
 }
 
 func main() {
@@ -74,6 +77,25 @@ func runTerminalSession(serverURL, sessionID string) error {
 	fmt.Println("✅ 已连接到中继服务器")
 	fmt.Println("💡 现在可以在Web终端中输入命令了")
 	fmt.Println()
+
+	// 设置心跳机制
+	setupHeartbeat(conn)
+
+	// 发送初始化消息（工作目录和系统信息）
+	wd, _ := os.Getwd()
+	initMsg := TerminalMessage{
+		Type:        "init",
+		Session:     sessionID,
+		UserID:      "client",
+		WorkingDir:  wd,
+		OSInfo:      "unix",
+	}
+	jsonData, _ := json.Marshal(initMsg)
+	if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
+		log.Printf("❌ 发送初始化消息失败: %v", err)
+	} else {
+		log.Printf("✅ 已发送初始化消息: 工作目录=%s", wd)
+	}
 
 	// 创建 PTY
 	shell := os.Getenv("SHELL")
@@ -183,4 +205,36 @@ func buildWebSocketURL(serverURL, sessionID string) (string, error) {
 	wsURL := fmt.Sprintf("%s://%s/api/terminal/%s?type=client&user_id=client",
 		scheme, parsedURL.Host, sessionID)
 	return wsURL, nil
+}
+
+// setupHeartbeat 设置心跳机制
+func setupHeartbeat(conn *websocket.Conn) {
+	// 设置ping handler，自动回复pong
+	conn.SetPingHandler(func(appData string) error {
+		log.Printf("💓 收到服务器ping")
+		return conn.WriteMessage(websocket.PongMessage, []byte(appData))
+	})
+
+	// 设置pong handler
+	conn.SetPongHandler(func(appData string) error {
+		log.Printf("💓 收到服务器pong")
+		return nil
+	})
+
+	// 定期发送ping
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				if err := conn.WriteMessage(websocket.PingMessage, []byte("heartbeat")); err != nil {
+					log.Printf("❌ 发送ping失败: %v", err)
+					return
+				}
+				log.Printf("💓 发送ping到服务器")
+			}
+		}
+	}()
 }

@@ -3,384 +3,2003 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CliGool - 跨平台远程终端</title>
+    <meta name="description" content="CliGool - 跨平台远程终端解决方案。支持Windows、Linux、macOS，WebSocket加密传输，低延迟实时响应，开箱即用。">
+    <meta name="keywords" content="远程终端,跨平台终端,Web终端,SSH,WebSocket,终端工具">
+    <title>CliGool - 跨平台远程终端解决方案</title>
     <style>
-        * {
+        /* ===================================
+           Critical CSS - Inline for Performance
+           =================================== */
+        /* Prevent FOUC and enable immediate rendering */
+        html { visibility: hidden; }
+        body.js-loaded { visibility: visible; }
+
+        /* ===================================
+           Design Tokens & CSS Variables
+           =================================== */
+        :root {
+            /* Color System - Primary */
+            --color-primary-50: #eef2ff;
+            --color-primary-100: #e0e7ff;
+            --color-primary-200: #c7d2fe;
+            --color-primary-300: #a5b4fc;
+            --color-primary-400: #818cf8;
+            --color-primary-500: #6366f1;
+            --color-primary-600: #4f46e5;
+            --color-primary-700: #4338ca;
+            --color-primary-800: #3730a3;
+            --color-primary-900: #312e81;
+
+            /* Color System - Accent */
+            --color-accent-50: #fdf4ff;
+            --color-accent-100: #fae8ff;
+            --color-accent-400: #e879f9;
+            --color-accent-500: #d946ef;
+            --color-accent-600: #c026d3;
+
+            /* Color System - Neutral */
+            --color-gray-50: #f9fafb;
+            --color-gray-100: #f3f4f6;
+            --color-gray-200: #e5e7eb;
+            --color-gray-300: #d1d5db;
+            --color-gray-400: #9ca3af;
+            --color-gray-500: #6b7280;
+            --color-gray-600: #4b5563;
+            --color-gray-700: #374151;
+            --color-gray-800: #1f2937;
+            --color-gray-900: #111827;
+
+            /* Color System - Semantic */
+            --color-success: #10b981;
+            --color-warning: #f59e0b;
+            --color-error: #ef4444;
+            --color-info: #3b82f6;
+
+            /* Spacing Scale */
+            --spacing-1: 0.25rem;
+            --spacing-2: 0.5rem;
+            --spacing-3: 0.75rem;
+            --spacing-4: 1rem;
+            --spacing-5: 1.25rem;
+            --spacing-6: 1.5rem;
+            --spacing-8: 2rem;
+            --spacing-10: 2.5rem;
+            --spacing-12: 3rem;
+            --spacing-16: 4rem;
+            --spacing-20: 5rem;
+            --spacing-24: 6rem;
+
+            /* Typography */
+            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+            --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+
+            /* Font Sizes */
+            --text-xs: 0.75rem;
+            --text-sm: 0.875rem;
+            --text-base: 1rem;
+            --text-lg: 1.125rem;
+            --text-xl: 1.25rem;
+            --text-2xl: 1.5rem;
+            --text-3xl: 1.875rem;
+            --text-4xl: 2.25rem;
+            --text-5xl: 3rem;
+            --text-6xl: 3.75rem;
+
+            /* Border Radius */
+            --radius-sm: 0.375rem;
+            --radius-md: 0.5rem;
+            --radius-lg: 0.75rem;
+            --radius-xl: 1rem;
+            --radius-2xl: 1.5rem;
+            --radius-full: 9999px;
+
+            /* Enhanced Shadows with Color */
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+            --shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+
+            /* Colored Shadows */
+            --shadow-primary: 0 10px 40px -10px rgba(99, 102, 241, 0.5);
+            --shadow-accent: 0 10px 40px -10px rgba(217, 70, 239, 0.5);
+            --shadow-success: 0 10px 40px -10px rgba(16, 185, 129, 0.4);
+
+            /* Advanced Transitions */
+            --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-base: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-bounce: 600ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            --transition-smooth: 400ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+            /* Z-Index Scale */
+            --z-base: 0;
+            --z-dropdown: 1000;
+            --z-sticky: 1020;
+            --z-fixed: 1030;
+            --z-modal-backdrop: 1040;
+            --z-modal: 1050;
+            --z-popover: 1060;
+            --z-tooltip: 1070;
+
+            /* Animation Timings */
+            --animation-duration-short: 0.3s;
+            --animation-duration-medium: 0.5s;
+            --animation-duration-long: 0.8s;
+
+            /* Glassmorphism */
+            --glass-bg: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --glass-blur: 12px;
+        }
+
+        /* ===================================
+           CSS Reset & Base Styles
+           =================================== */
+        *, *::before, *::after {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
+        html {
+            scroll-behavior: smooth;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
+        }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #d4d4d4;
-            min-height: 100vh;
+            font-family: var(--font-sans);
+            font-size: var(--text-base);
             line-height: 1.6;
+            color: var(--color-gray-800);
+            background: var(--color-gray-50);
+            overflow-x: hidden;
+            /* Enhanced scroll performance */
+            overscroll-behavior: none;
+            /* Prevent text size adjustment on orientation change */
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
+        /* Focus Visible for Accessibility - Enhanced */
+        :focus-visible {
+            outline: 3px solid var(--color-primary-500);
+            outline-offset: 3px;
+            border-radius: var(--radius-sm);
         }
 
-        .header {
-            text-align: center;
-            padding: 60px 20px;
+        /* Enhanced Skip Link */
+        .skip-link {
+            position: absolute;
+            top: -100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(-10px);
+            background: linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700));
             color: white;
-        }
-
-        .header h1 {
-            font-size: 3rem;
-            margin-bottom: 10px;
-            font-weight: 700;
-        }
-
-        .header p {
-            font-size: 1.2rem;
-            opacity: 0.9;
-        }
-
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 40px;
-        }
-
-        .feature {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 20px;
-            border-radius: 10px;
-            backdrop-filter: blur(10px);
-        }
-
-        .feature h3 {
-            color: #4ec9b0;
-            margin-bottom: 10px;
-        }
-
-        .downloads {
-            background: white;
-            border-radius: 15px;
-            padding: 40px;
-            margin-bottom: 40px;
-            color: #1e1e1e;
-        }
-
-        .downloads h2 {
-            text-align: center;
-            margin-bottom: 30px;
-            color: #667eea;
-        }
-
-        .download-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
-        }
-
-        .download-card {
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            padding: 20px;
-            transition: all 0.3s;
-        }
-
-        .download-card:hover {
-            border-color: #667eea;
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-        }
-
-        .download-card h3 {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 15px;
-            color: #1e1e1e;
-        }
-
-        .platform-icon {
-            font-size: 1.5rem;
-        }
-
-        .download-info {
-            color: #666;
-            font-size: 0.9rem;
-            margin-bottom: 15px;
-        }
-
-        .download-btn {
-            display: inline-block;
-            background: #667eea;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 5px;
+            padding: var(--spacing-4) var(--spacing-8);
+            border-radius: var(--radius-lg);
             text-decoration: none;
-            font-weight: 600;
-            transition: all 0.3s;
-            width: 100%;
-            text-align: center;
+            font-weight: 700;
+            font-size: var(--text-lg);
+            z-index: var(--z-tooltip);
+            transition: all var(--transition-smooth);
+            box-shadow: var(--shadow-lg);
+            border: 2px solid rgba(255, 255, 255, 0.2);
         }
 
-        .download-btn:hover {
-            background: #5568d3;
-            transform: scale(1.05);
+        .skip-link:focus {
+            top: var(--spacing-6);
+            transform: translateX(-50%) translateY(0);
         }
 
-        .download-btn:active {
-            transform: scale(0.95);
-        }
-
-        .usage {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 15px;
-            padding: 40px;
-            margin-bottom: 40px;
-            backdrop-filter: blur(10px);
-        }
-
-        .usage h2 {
-            color: white;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-
-        .usage-steps {
-            display: grid;
-            gap: 20px;
-            color: white;
-        }
-
-        .usage-step {
-            display: flex;
-            gap: 15px;
-            align-items: flex-start;
-        }
-
-        .step-number {
-            background: #4ec9b0;
-            color: #1e1e1e;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
+        /* Loading State */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: var(--color-gray-900);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: bold;
-            flex-shrink: 0;
+            z-index: var(--z-modal);
+            transition: opacity var(--transition-slow), visibility var(--transition-slow);
         }
 
-        .step-content h4 {
-            margin-bottom: 5px;
+        .loading-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
         }
 
-        .step-content p {
-            opacity: 0.8;
-            font-size: 0.95rem;
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top-color: var(--color-primary-500);
+            border-radius: var(--radius-full);
+            animation: spin 0.8s linear infinite;
         }
 
-        .terminal-demo {
-            background: #1e1e1e;
-            border-radius: 10px;
-            padding: 20px;
-            margin-top: 20px;
-            font-family: 'Courier New', monospace;
-            overflow-x: auto;
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
-        .terminal-line {
-            margin-bottom: 5px;
+        /* Skeleton Loading */
+        .skeleton {
+            background: linear-gradient(
+                90deg,
+                var(--color-gray-200) 25%,
+                var(--color-gray-100) 50%,
+                var(--color-gray-200) 75%
+            );
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: var(--radius-md);
         }
 
-        .terminal-prompt {
-            color: #4ec9b0;
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
         }
 
-        .terminal-command {
-            color: #d4d4d4;
-        }
-
-        .terminal-output {
-            color: #888;
-        }
-
-        .footer {
+        /* ===================================
+           Hero Section - Enhanced
+           =================================== */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
             text-align: center;
-            padding: 20px;
-            color: rgba(255, 255, 255, 0.7);
+            padding: var(--spacing-20) var(--spacing-4);
+            position: relative;
+            background: linear-gradient(135deg, var(--color-primary-600) 0%, var(--color-primary-800) 100%);
+            overflow: hidden;
+            /* GPU加速 */
+            transform: translateZ(0);
+            will-change: transform;
         }
 
-        .badge {
-            display: inline-block;
-            background: #4ec9b0;
-            color: #1e1e1e;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            margin-left: 10px;
+        /* Enhanced Animated Background Pattern */
+        .hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image:
+                radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 75% 75%, rgba(255, 255, 255, 0.08) 0%, transparent 50%),
+                linear-gradient(45deg, transparent 48%, rgba(255, 255, 255, 0.02) 50%, transparent 52%);
+            background-size: 60px 60px, 60px 60px, 30px 30px;
+            opacity: 0.7;
+            animation: patternMove 40s linear infinite;
+            will-change: transform;
         }
 
-        .new-badge {
-            background: #f48771;
+        @keyframes patternMove {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            50% { transform: translate(-30px, -30px) rotate(1deg); }
+        }
+
+        /* Interactive Mouse-following Gradient */
+        .hero-mouse-gradient {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(
+                circle,
+                rgba(99, 102, 241, 0.3) 0%,
+                transparent 70%
+            );
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            transition: opacity 0.3s ease;
+            opacity: 0;
+            will-change: transform, opacity;
+        }
+
+        .hero:hover .hero-mouse-gradient {
+            opacity: 1;
+        }
+
+        /* Enhanced Decorative Gradient Orbs */
+        .hero-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.5;
+            pointer-events: none;
+            will-change: transform;
+        }
+
+        .hero-orb-1 {
+            width: 500px;
+            height: 500px;
+            background: linear-gradient(135deg, var(--color-accent-400), var(--color-accent-500));
+            top: -150px;
+            right: -150px;
+            animation: enhancedFloat 12s ease-in-out infinite;
+        }
+
+        .hero-orb-2 {
+            width: 400px;
+            height: 400px;
+            background: linear-gradient(135deg, var(--color-primary-300), var(--color-primary-400));
+            bottom: -100px;
+            left: -100px;
+            animation: enhancedFloat 15s ease-in-out infinite reverse;
+        }
+
+        @keyframes enhancedFloat {
+            0%, 100% {
+                transform: translate(0, 0) scale(1) rotate(0deg);
+                filter: blur(100px) hue-rotate(0deg);
+            }
+            33% {
+                transform: translate(30px, -30px) scale(1.1) rotate(5deg);
+                filter: blur(120px) hue-rotate(10deg);
+            }
+            66% {
+                transform: translate(-20px, 20px) scale(0.95) rotate(-5deg);
+                filter: blur(80px) hue-rotate(-10deg);
+            }
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: var(--z-base);
+            max-width: 900px;
+            width: 100%;
+            /* 性能优化 */
+            contain: layout style;
+        }
+
+        .logo {
+            font-size: clamp(3rem, 10vw, 5rem);
+            margin-bottom: var(--spacing-4);
+            animation: logoEntrance 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+            cursor: default;
+            transition: transform var(--transition-smooth);
+            will-change: transform;
+        }
+
+        .logo:hover {
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        @keyframes logoEntrance {
+            0% {
+                opacity: 0;
+                transform: scale(0.5) translateY(-50px) rotate(-180deg);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1) translateY(0) rotate(0deg);
+            }
+        }
+
+        .hero h1 {
+            font-size: clamp(2.5rem, 8vw, 4rem);
+            font-weight: 900;
             color: white;
+            margin-bottom: var(--spacing-4);
+            text-shadow:
+                0 4px 24px rgba(0, 0, 0, 0.3),
+                0 0 80px rgba(99, 102, 241, 0.3);
+            letter-spacing: -0.03em;
+            animation: fadeInUp 0.8s ease-out 0.2s both;
+            line-height: 1.05;
+            /* 文字渐变效果 */
+            background: linear-gradient(135deg, #ffffff 0%, rgba(255, 255, 255, 0.85) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            will-change: transform, opacity;
         }
 
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .tagline {
+            font-size: clamp(1rem, 3vw, 1.25rem);
+            color: rgba(255, 255, 255, 0.95);
+            margin-bottom: var(--spacing-10);
+            font-weight: 400;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            animation: fadeInUp 0.8s ease-out 0.4s both;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            letter-spacing: 0.02em;
+        }
+
+        /* ===================================
+           Features Grid - Enhanced with Micro-interactions
+           =================================== */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--spacing-5);
+            margin-bottom: var(--spacing-12);
+            animation: fadeInUp 0.8s ease-out 0.5s both;
+            /* 性能优化 */
+            contain: layout style;
+        }
+
+        .feature-item {
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--glass-blur));
+            -webkit-backdrop-filter: blur(var(--glass-blur));
+            padding: var(--spacing-6);
+            border-radius: var(--radius-xl);
+            border: 1px solid var(--glass-border);
+            transition: all var(--transition-smooth);
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            /* GPU加速 */
+            transform: translateZ(0);
+            will-change: transform;
+        }
+
+        /* Shimmer effect on hover */
+        .feature-item::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                rgba(255, 255, 255, 0.2),
+                transparent
+            );
+            transition: left 0.6s ease;
+        }
+
+        .feature-item:hover::after {
+            left: 100%;
+        }
+
+        .feature-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--color-accent-400), var(--color-primary-400));
+            transform: scaleX(0);
+            transition: transform var(--transition-smooth);
+        }
+
+        .feature-item:hover {
+            transform: translateY(-8px) scale(1.02);
+            background: rgba(255, 255, 255, 0.2);
+            box-shadow:
+                var(--shadow-xl),
+                0 0 40px rgba(99, 102, 241, 0.3);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .feature-item:hover::before {
+            transform: scaleX(1);
+        }
+
+        .feature-item:active {
+            transform: translateY(-4px) scale(0.98);
+        }
+
+        .feature-icon {
+            font-size: clamp(2rem, 5vw, 2.5rem);
+            margin-bottom: var(--spacing-3);
+            display: block;
+            transition: transform var(--transition-bounce);
+            will-change: transform;
+        }
+
+        .feature-item:hover .feature-icon {
+            transform: scale(1.2) rotate(10deg);
+        }
+
+        .feature-title {
+            font-size: var(--text-lg);
+            font-weight: 700;
+            color: white;
+            margin-bottom: var(--spacing-2);
+            transition: transform var(--transition-fast);
+        }
+
+        .feature-item:hover .feature-title {
+            transform: translateX(4px);
+        }
+
+        .feature-desc {
+            font-size: var(--text-sm);
+            color: rgba(255, 255, 255, 0.9);
+            line-height: 1.6;
+            transition: opacity var(--transition-fast);
+        }
+
+        .feature-item:hover .feature-desc {
+            opacity: 1;
+        }
+
+        /* ===================================
+           CTA Button - Enhanced with Advanced Interactions
+           =================================== */
+        .cta-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--spacing-2);
+            padding: var(--spacing-5) var(--spacing-12);
+            font-size: var(--text-lg);
+            font-weight: 700;
+            color: white;
+            background: linear-gradient(135deg, var(--color-accent-500) 0%, var(--color-accent-600) 100%);
+            border: none;
+            border-radius: var(--radius-full);
+            cursor: pointer;
+            text-decoration: none;
+            box-shadow:
+                0 10px 30px rgba(217, 70, 239, 0.4),
+                0 0 0 0 rgba(217, 70, 239, 0.7);
+            transition: all var(--transition-smooth);
+            animation: fadeInUp 0.8s ease-out 0.6s both, pulse 2s ease-in-out infinite 2s;
+            position: relative;
+            overflow: hidden;
+            /* GPU加速 */
+            transform: translateZ(0);
+            will-change: transform, box-shadow;
+        }
+
+        /* Animated gradient overlay */
+        .cta-button::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, var(--color-accent-600) 0%, var(--color-accent-500) 100%);
+            opacity: 0;
+            transition: opacity var(--transition-smooth);
+        }
+
+        /* Ripple effect */
+        .cta-button::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.6s ease, height 0.6s ease;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-4px) scale(1.05);
+            box-shadow:
+                0 20px 40px rgba(217, 70, 239, 0.5),
+                0 0 0 8px rgba(217, 70, 239, 0.3);
+        }
+
+        .cta-button:hover::before {
+            opacity: 1;
+        }
+
+        .cta-button:active::after {
+            width: 300px;
+            height: 300px;
+        }
+
+        .cta-button:active {
+            transform: translateY(-2px) scale(1.02);
+        }
+
+        .cta-button span {
+            position: relative;
+            z-index: 1;
+            transition: transform var(--transition-fast);
+        }
+
+        .cta-button:hover span:last-child {
+            transform: translateX(4px);
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow:
+                    0 10px 30px rgba(217, 70, 239, 0.4),
+                    0 0 0 0 rgba(217, 70, 239, 0.7);
+            }
+            50% {
+                box-shadow:
+                    0 10px 30px rgba(217, 70, 239, 0.4),
+                    0 0 0 10px rgba(217, 70, 239, 0);
+            }
+        }
+
+        /* Focus state for accessibility */
+        .cta-button:focus-visible {
+            outline: 3px solid white;
+            outline-offset: 4px;
+        }
+
+        /* ===================================
+           Downloads Section - Enhanced with Scroll Animations
+           =================================== */
+        .downloads-section {
+            background: var(--color-gray-50);
+            padding: var(--spacing-24) var(--spacing-4);
+            position: relative;
+            /* 性能优化 */
+            content-visibility: auto;
+            contain-intrinsic-size: 1000px;
+        }
+
+        /* Animated background elements */
+        .downloads-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                var(--color-primary-300),
+                transparent
+            );
+            opacity: 0.5;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: var(--spacing-16);
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all var(--transition-slow);
+        }
+
+        .section-header.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .section-header h2 {
+            font-size: clamp(1.875rem, 5vw, 2.5rem);
+            font-weight: 800;
+            margin-bottom: var(--spacing-4);
+            color: var(--color-gray-900);
+            letter-spacing: -0.03em;
+            background: linear-gradient(135deg, var(--color-gray-900), var(--color-primary-700));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .section-header p {
+            font-size: var(--text-lg);
+            color: var(--color-gray-600);
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.7;
+        }
+
+        .downloads-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: var(--spacing-6);
+            max-width: 1280px;
+            margin: 0 auto;
+            /* 性能优化 */
+            contain: layout style;
+        }
+
+        .download-card {
+            background: white;
+            border-radius: var(--radius-2xl);
+            padding: var(--spacing-8);
+            text-align: center;
+            transition: all var(--transition-smooth);
+            border: 2px solid var(--color-gray-200);
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+            opacity: 0;
+            transform: translateY(40px);
+            cursor: pointer;
+            /* GPU加速 */
+            transform: translateZ(0);
+            will-change: transform, opacity;
+        }
+
+        .download-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Staggered animation delays */
+        .download-card:nth-child(1) { transition-delay: 0.1s; }
+        .download-card:nth-child(2) { transition-delay: 0.2s; }
+        .download-card:nth-child(3) { transition-delay: 0.3s; }
+        .download-card:nth-child(4) { transition-delay: 0.4s; }
+        .download-card:nth-child(5) { transition-delay: 0.5s; }
+        .download-card:nth-child(6) { transition-delay: 0.6s; }
+
+        /* Animated gradient border */
+        .download-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: linear-gradient(90deg, var(--color-primary-500), var(--color-accent-500), var(--color-primary-500));
+            background-size: 200% 100%;
+            transform: scaleX(0);
+            transition: transform var(--transition-smooth);
+        }
+
+        .download-card:hover::before {
+            transform: scaleX(1);
+            animation: gradientMove 2s linear infinite;
+        }
+
+        @keyframes gradientMove {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 200% 50%; }
+        }
+
+        /* Hover glow effect */
+        .download-card::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(
+                circle at center,
+                rgba(99, 102, 241, 0.1) 0%,
+                transparent 70%
+            );
+            opacity: 0;
+            transition: opacity var(--transition-smooth);
+            pointer-events: none;
+        }
+
+        .download-card:hover {
+            transform: translateY(-12px) scale(1.02);
+            box-shadow:
+                var(--shadow-2xl),
+                0 0 40px rgba(99, 102, 241, 0.2);
+            border-color: var(--color-primary-300);
+        }
+
+        .download-card:hover::after {
+            opacity: 1;
+        }
+
+        .download-card:active {
+            transform: translateY(-8px) scale(0.98);
+        }
+
+        .platform-icon {
+            font-size: clamp(2.5rem, 6vw, 3rem);
+            margin-bottom: var(--spacing-4);
+            display: block;
+            transition: transform var(--transition-bounce);
+            will-change: transform;
+        }
+
+        .download-card:hover .platform-icon {
+            transform: scale(1.2) rotate(-5deg);
+        }
+
+        .download-title {
+            font-size: var(--text-xl);
+            font-weight: 800;
+            color: var(--color-gray-900);
+            margin-bottom: var(--spacing-3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--spacing-2);
+            flex-wrap: wrap;
+            transition: transform var(--transition-fast);
+        }
+
+        .download-card:hover .download-title {
+            transform: translateX(-4px);
+        }
+
+        /* ===================================
+           Enhanced Badge System with Animations
+           =================================== */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: var(--spacing-2) var(--spacing-3);
+            border-radius: var(--radius-full);
+            font-size: var(--text-xs);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            position: relative;
+            overflow: hidden;
+            transition: all var(--transition-smooth);
+            cursor: default;
+            /* GPU加速 */
+            transform: translateZ(0);
+            will-change: transform;
+        }
+
+        /* Shimmer effect for badges */
+        .badge::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                rgba(255, 255, 255, 0.4),
+                transparent
+            );
+            transition: left 0.5s ease;
+        }
+
+        .badge:hover::before {
+            left: 100%;
+        }
+
+        .badge:hover {
+            transform: scale(1.1);
+        }
+
+        .badge-hot {
+            background: linear-gradient(135deg, var(--color-accent-500), var(--color-accent-600));
+            color: white;
+            box-shadow: 0 4px 12px rgba(217, 70, 239, 0.4);
+            animation: badgePulse 2s ease-in-out infinite;
+        }
+
+        .badge-new {
+            background: linear-gradient(135deg, var(--color-info), #0ea5e9);
+            color: white;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .badge-popular {
+            background: linear-gradient(135deg, var(--color-success), #059669);
+            color: white;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        }
+
+        @keyframes badgePulse {
+            0%, 100% {
+                box-shadow: 0 4px 12px rgba(217, 70, 239, 0.4);
+            }
+            50% {
+                box-shadow: 0 4px 20px rgba(217, 70, 239, 0.7);
+            }
+        }
+
+        .download-info {
+            font-size: var(--text-sm);
+            color: var(--color-gray-600);
+            margin-bottom: var(--spacing-6);
+            line-height: 1.7;
+            transition: color var(--transition-fast);
+        }
+
+        .download-card:hover .download-info {
+            color: var(--color-gray-700);
+        }
+
+        .download-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--spacing-2);
+            width: 100%;
+            padding: var(--spacing-4) var(--spacing-6);
+            background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-700));
+            color: white;
+            text-decoration: none;
+            border-radius: var(--radius-lg);
+            font-weight: 700;
+            font-size: var(--text-sm);
+            transition: all var(--transition-smooth);
+            box-shadow:
+                0 4px 12px rgba(79, 70, 229, 0.3),
+                0 0 0 0 rgba(79, 70, 229, 0.7);
+            position: relative;
+            overflow: hidden;
+            /* GPU加速 */
+            transform: translateZ(0);
+            will-change: transform, box-shadow;
+        }
+
+        /* Animated gradient overlay */
+        .download-button::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, var(--color-primary-600), var(--color-primary-800));
+            opacity: 0;
+            transition: opacity var(--transition-smooth);
+        }
+
+        /* Progress bar effect */
+        .download-button::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            width: 0;
+            background: linear-gradient(90deg, var(--color-accent-400), var(--color-primary-400));
+            transition: width var(--transition-smooth);
+        }
+
+        .download-button:hover {
+            transform: translateY(-3px);
+            box-shadow:
+                0 8px 24px rgba(79, 70, 229, 0.4),
+                0 0 0 4px rgba(79, 70, 229, 0.2);
+        }
+
+        .download-button:hover::before {
+            opacity: 1;
+        }
+
+        .download-button:hover::after {
+            width: 100%;
+        }
+
+        .download-button:active {
+            transform: translateY(-1px);
+        }
+
+        .download-button span {
+            position: relative;
+            z-index: 1;
+            transition: transform var(--transition-fast);
+        }
+
+        .download-button:hover span {
+            transform: translateY(-1px);
+        }
+
+        /* ===================================
+           Usage Section - Enhanced with Advanced Animations
+           =================================== */
+        .usage-section {
+            background: linear-gradient(135deg, var(--color-gray-100) 0%, var(--color-gray-200) 100%);
+            padding: var(--spacing-24) var(--spacing-4);
+            position: relative;
+            /* 性能优化 */
+            content-visibility: auto;
+            contain-intrinsic-size: 800px;
+        }
+
+        /* Animated background pattern */
+        .usage-section::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image:
+                radial-gradient(circle at 20% 50%, rgba(99, 102, 241, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 80% 50%, rgba(217, 70, 239, 0.05) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .steps-container {
+            max-width: 800px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        /* Connecting line */
+        .steps-container::before {
+            content: '';
+            position: absolute;
+            left: 27px;
+            top: 56px;
+            bottom: 56px;
+            width: 2px;
+            background: linear-gradient(
+                180deg,
+                var(--color-primary-300) 0%,
+                var(--color-primary-200) 50%,
+                var(--color-primary-300) 100%
+            );
+            opacity: 0.3;
+        }
+
+        .step {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: var(--spacing-10);
+            position: relative;
+            opacity: 0;
+            transform: translateX(-30px);
+            transition: all var(--transition-slow);
+        }
+
+        .step.visible {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .step:last-child {
+            margin-bottom: 0;
+        }
+
+        .step-number {
+            flex-shrink: 0;
+            width: 56px;
+            height: 56px;
+            border-radius: var(--radius-full);
+            background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-700));
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: var(--text-xl);
+            box-shadow:
+                0 4px 12px rgba(79, 70, 229, 0.3),
+                0 0 0 0 rgba(79, 70, 229, 0.4);
+            position: relative;
+            z-index: 1;
+            transition: all var(--transition-smooth);
+            cursor: default;
+            /* GPU加速 */
+            transform: translateZ(0);
+            will-change: transform, box-shadow;
+        }
+
+        .step:hover .step-number {
+            transform: scale(1.15) rotate(10deg);
+            box-shadow:
+                0 8px 20px rgba(79, 70, 229, 0.5),
+                0 0 0 8px rgba(79, 70, 229, 0.2);
+        }
+
+        /* Ripple animation for step number */
+        .step-number::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: var(--radius-full);
+            background: inherit;
+            opacity: 0;
+            animation: ripple 2s ease-out infinite;
+        }
+
+        @keyframes ripple {
+            0% {
+                transform: scale(1);
+                opacity: 0.5;
+            }
+            100% {
+                transform: scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        .step-content {
+            flex: 1;
+            margin-left: var(--spacing-5);
+            padding-top: var(--spacing-2);
+            transition: transform var(--transition-fast);
+        }
+
+        .step:hover .step-content {
+            transform: translateX(4px);
+        }
+
+        .step-title {
+            font-size: var(--text-xl);
+            font-weight: 800;
+            color: var(--color-gray-900);
+            margin-bottom: var(--spacing-2);
+            letter-spacing: -0.02em;
+        }
+
+        .step-desc {
+            font-size: var(--text-base);
+            color: var(--color-gray-600);
+            line-height: 1.7;
+            margin-bottom: var(--spacing-3);
+        }
+
+        .code-block {
+            background: var(--color-gray-900);
+            color: var(--color-gray-100);
+            padding: var(--spacing-4) var(--spacing-5);
+            border-radius: var(--radius-lg);
+            font-family: var(--font-mono);
+            font-size: var(--text-sm);
+            margin-top: var(--spacing-3);
+            border-left: 4px solid var(--color-primary-500);
+            overflow-x: auto;
+            box-shadow:
+                var(--shadow-md),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            position: relative;
+            transition: all var(--transition-smooth);
+            cursor: pointer;
+        }
+
+        .code-block:hover {
+            border-left-color: var(--color-primary-400);
+            box-shadow:
+                var(--shadow-lg),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            transform: translateX(4px);
+        }
+
+        /* Copy indicator */
+        .code-block::after {
+            content: '点击复制';
+            position: absolute;
+            top: var(--spacing-2);
+            right: var(--spacing-2);
+            font-size: var(--text-xs);
+            color: var(--color-gray-400);
+            background: rgba(255, 255, 255, 0.1);
+            padding: var(--spacing-1) var(--spacing-2);
+            border-radius: var(--radius-sm);
+            opacity: 0;
+            transition: opacity var(--transition-fast);
+        }
+
+        .code-block:hover::after {
+            opacity: 1;
+        }
+
+        .code-block.copied::after {
+            content: '已复制!';
+            color: var(--color-success);
+        }
+
+        /* ===================================
+           Footer - Enhanced with Hover Effects
+           =================================== */
+        footer {
+            background: var(--color-gray-900);
+            color: var(--color-gray-400);
+            padding: var(--spacing-12) var(--spacing-4);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Footer gradient overlay */
+        footer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                var(--color-primary-500),
+                var(--color-accent-500),
+                var(--color-primary-500),
+                transparent
+            );
+            opacity: 0.5;
+        }
+
+        footer p {
+            margin-bottom: var(--spacing-2);
+            transition: transform var(--transition-fast);
+        }
+
+        footer:hover p {
+            transform: translateY(-2px);
+        }
+
+        footer a {
+            color: var(--color-primary-400);
+            text-decoration: none;
+            transition: all var(--transition-smooth);
+            position: relative;
+            display: inline-block;
+        }
+
+        footer a::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--color-primary-400), var(--color-accent-400));
+            transition: width var(--transition-smooth);
+        }
+
+        footer a:hover {
+            color: var(--color-primary-300);
+        }
+
+        footer a:hover::after {
+            width: 100%;
+        }
+
+        /* ===================================
+           Responsive Design - Enhanced
+           =================================== */
         @media (max-width: 768px) {
-            .header h1 {
+            .hero {
+                padding: var(--spacing-16) var(--spacing-4);
+            }
+
+            .hero-mouse-gradient {
+                display: none;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+                gap: var(--spacing-4);
+            }
+
+            .downloads-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .steps-container::before {
+                left: 24px;
+            }
+
+            .step {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .step-number {
+                margin-bottom: var(--spacing-3);
+            }
+
+            .step-content {
+                margin-left: 0;
+            }
+
+            .section-header {
+                padding: 0 var(--spacing-4);
+            }
+
+            /* Reduce animation intensity on mobile */
+            .hero-orb {
+                filter: blur(60px);
+                opacity: 0.3;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .hero h1 {
                 font-size: 2rem;
             }
 
-            .downloads {
-                padding: 20px;
+            .tagline {
+                font-size: 1rem;
             }
 
-            .download-grid {
-                grid-template-columns: 1fr;
+            .cta-button {
+                width: 100%;
+                padding: var(--spacing-4) var(--spacing-6);
+                font-size: var(--text-base);
             }
+
+            .download-card {
+                padding: var(--spacing-6);
+            }
+
+            .step-number {
+                width: 48px;
+                height: 48px;
+                font-size: var(--text-lg);
+            }
+        }
+
+        /* ===================================
+           Accessibility Enhancements - Beyond WCAG AA
+           =================================== */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+
+            .loading-overlay {
+                transition: none;
+            }
+        }
+
+        /* Enhanced High Contrast Mode Support */
+        @media (prefers-contrast: high) {
+            .feature-item,
+            .download-card {
+                border-width: 3px;
+                border-color: currentColor;
+            }
+
+            .cta-button,
+            .download-button {
+                border: 3px solid currentColor;
+            }
+
+            .step-number {
+                border: 2px solid currentColor;
+            }
+
+            .code-block {
+                border-width: 3px;
+            }
+        }
+
+        /* Screen Reader Only Content */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        /* Enhanced Focus Management */
+        :focus:not(:focus-visible) {
+            outline: none;
+        }
+
+        /* Skip Link Enhancement */
+        @media (prefers-reduced-motion: no-preference) {
+            .skip-link {
+                animation: slideDown 0.3s ease-out;
+            }
+
+            @keyframes slideDown {
+                from {
+                    transform: translateX(-50%) translateY(-20px);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(-50%) translateY(0);
+                    opacity: 1;
+                }
+            }
+        }
+
+        /* ===================================
+           Enhanced Dark Mode Support
+           =================================== */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: var(--color-gray-900);
+                color: var(--color-gray-100);
+            }
+
+            .downloads-section,
+            .usage-section {
+                background: var(--color-gray-800);
+            }
+
+            .download-card {
+                background: var(--color-gray-700);
+                border-color: var(--color-gray-600);
+            }
+
+            .section-header h2,
+            .download-title,
+            .step-title {
+                color: var(--color-gray-100);
+            }
+
+            .download-info,
+            .step-desc,
+            .section-header p {
+                color: var(--color-gray-400);
+            }
+
+            /* Enhanced dark mode adjustments */
+            .code-block {
+                background: var(--color-gray-800);
+                border-left-color: var(--color-primary-400);
+            }
+
+            .download-card:hover {
+                border-color: var(--color-primary-500);
+            }
+        }
+
+        /* Print Styles */
+        @media print {
+            .hero::before,
+            .hero-orb,
+            .skip-link {
+                display: none;
+            }
+
+            .hero {
+                background: white;
+                color: black;
+                min-height: auto;
+                padding: var(--spacing-8);
+            }
+
+            .hero h1,
+            .tagline {
+                color: black;
+            }
+
+            .download-card {
+                break-inside: avoid;
+                box-shadow: none;
+                border: 1px solid var(--color-gray-300);
+            }
+        }
+
+        /* ===================================
+           Advanced Performance Optimizations
+           =================================== */
+        /* Enhanced GPU Acceleration */
+        .hero-orb,
+        .feature-item,
+        .download-card,
+        .cta-button,
+        .download-button,
+        .step-number,
+        .platform-icon {
+            transform: translateZ(0);
+            backface-visibility: hidden;
+            perspective: 1000px;
+        }
+
+        /* Optimized will-change usage */
+        .hero-orb,
+        .feature-item:hover,
+        .download-card:hover,
+        .cta-button:hover,
+        .download-button:hover {
+            will-change: transform, opacity;
+        }
+
+        /* Remove will-change when not needed */
+        .feature-item:not(:hover),
+        .download-card:not(:hover),
+        .cta-button:not(:hover),
+        .download-button:not(:hover) {
+            will-change: auto;
+        }
+
+        /* Content Visibility for Better Performance */
+        .downloads-section,
+        .usage-section {
+            content-visibility: auto;
+            contain-intrinsic-size: 1000px;
+        }
+
+        /* Font Loading Optimization */
+        @font-face {
+            font-family: 'System';
+            font-display: swap;
+        }
+
+        /* Image Optimization */
+        img {
+            content-visibility: auto;
+        }
+
+        /* Reduce paint complexity */
+        .hero,
+        .downloads-section,
+        .usage-section {
+            contain: layout style paint;
+        }
+
+        /* Smooth scrolling with hardware acceleration */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* Prevent layout shifts */
+        .hero-content,
+        .section-header,
+        .downloads-grid,
+        .steps-container {
+            contain: layout;
+        }
+
+        /* Optimized animations for 60fps */
+        @media (prefers-reduced-motion: no-preference) {
+            .hero-orb,
+            .feature-item,
+            .download-card,
+            .cta-button,
+            .download-button {
+                animation-composition: add;
+            }
+        }
+
+        /* Parallax effect (subtle) */
+        .parallax {
+            transform: translateZ(0);
+            will-change: transform;
+        }
+
+        /* Loading state for images */
+        [loading="lazy"] {
+            background: var(--color-gray-200);
+            min-height: 200px;
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <h1>🚀 CliGool</h1>
-            <p>跨平台远程终端解决方案</p>
-            <p style="margin-top: 10px; font-size: 1rem;">通过 Web 浏览器访问任何设备的终端</p>
-        </div>
-
-        <!-- Features -->
-        <div class="features">
-            <div class="feature">
-                <h3>🌐 跨平台支持</h3>
-                <p>支持 Windows、Linux、macOS，一个应用连接所有平台</p>
-            </div>
-            <div class="feature">
-                <h3>🔒 安全连接</h3>
-                <p>通过 WebSocket 加密连接，安全的远程终端访问</p>
-            </div>
-            <div class="feature">
-                <h3>⚡ 高性能</h3>
-                <p>优化的数据传输，低延迟的终端响应体验</p>
-            </div>
-            <div class="feature">
-                <h3>🎯 简单易用</h3>
-                <p>无需复杂配置，一键启动即可使用</p>
-            </div>
-        </div>
-
-        <!-- Downloads -->
-        <div class="downloads">
-            <h2>📥 下载客户端</h2>
-            <div class="download-grid">
-                <!-- Windows -->
-                <div class="download-card">
-                    <h3>
-                        <span class="platform-icon">🪟</span>
-                        Windows
-                        <span class="badge new-badge">推荐</span>
-                    </h3>
-                    <div class="download-info">
-                        支持 Windows 10/11<br>
-                        包含完整安装包
-                    </div>
-                    <a href="/downloads/cligool-windows-amd64.zip" class="download-btn">
-                        ⬇️ 下载 Windows 版本
-                    </a>
-                </div>
-
-                <!-- Linux -->
-                <div class="download-card">
-                    <h3>
-                        <span class="platform-icon">🐧</span>
-                        Linux
-                    </h3>
-                    <div class="download-info">
-                        支持 Ubuntu、Debian、CentOS<br>
-                        AMD64 架构
-                    </div>
-                    <a href="/downloads/cligool-linux-amd64" class="download-btn">
-                        ⬇️ 下载 Linux 版本
-                    </a>
-                </div>
-
-                <!-- macOS Intel -->
-                <div class="download-card">
-                    <h3>
-                        <span class="platform-icon">🍎</span>
-                        macOS (Intel)
-                    </h3>
-                    <div class="download-info">
-                        支持 macOS 10.15+<br>
-                        Intel 处理器
-                    </div>
-                    <a href="/downloads/cligool-darwin-amd64" class="download-btn">
-                        ⬇️ 下载 macOS Intel 版本
-                    </a>
-                </div>
-
-                <!-- macOS ARM -->
-                <div class="download-card">
-                    <h3>
-                        <span class="platform-icon">🍎</span>
-                        macOS (Apple Silicon)
-                        <span class="badge">M1/M2</span>
-                    </h3>
-                    <div class="download-info">
-                        支持 macOS 11+<br>
-                        Apple Silicon 处理器
-                    </div>
-                    <a href="/downloads/cligool-darwin-arm64" class="download-btn">
-                        ⬇️ 下载 macOS ARM 版本
-                    </a>
-                </div>
-            </div>
-        </div>
-
-        <!-- Usage Guide -->
-        <div class="usage">
-            <h2>🚀 快速开始</h2>
-            <div class="usage-steps">
-                <div class="usage-step">
-                    <div class="step-number">1</div>
-                    <div class="step-content">
-                        <h4>下载并解压客户端</h4>
-                        <p>选择适合您操作系统的版本，下载并解压到任意目录</p>
-                    </div>
-                </div>
-                <div class="usage-step">
-                    <div class="step-number">2</div>
-                    <div class="step-content">
-                        <h4>启动客户端</h4>
-                        <p>运行客户端程序，连接到中继服务器</p>
-                        <div class="terminal-demo">
-                            <div class="terminal-line"><span class="terminal-prompt">$</span> <span class="terminal-command">./cligool -server https://cligool.zty8.cn</span></div>
-                            <div class="terminal-line"><span class="terminal-output">✅ WebSocket已连接</span></div>
-                            <div class="terminal-line"><span class="terminal-output">🌐 Web访问: https://cligool.zty8.cn/session/xxx</span></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="usage-step">
-                    <div class="step-number">3</div>
-                    <div class="step-content">
-                        <h4>在浏览器中访问</h4>
-                        <p>打开显示的 Web 地址，即可在浏览器中使用终端</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Footer -->
-        <div class="footer">
-            <p>CliGool - 让远程终端访问变得简单</p>
-            <p style="margin-top: 10px; font-size: 0.9rem;">
-                开源项目 · 跨平台支持 · 安全可靠
-            </p>
-        </div>
+<body class="js-loading">
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay" aria-hidden="true">
+        <div class="loading-spinner"></div>
     </div>
+
+    <!-- Skip Link for Accessibility -->
+    <a href="#downloads" class="skip-link">跳转到下载区域</a>
+
+    <!-- Hero Section -->
+    <section class="hero" aria-labelledby="hero-title">
+        <!-- Decorative Background Orbs -->
+        <div class="hero-orb hero-orb-1" aria-hidden="true"></div>
+        <div class="hero-orb hero-orb-2" aria-hidden="true"></div>
+
+        <!-- Interactive Mouse-following Gradient -->
+        <div class="hero-mouse-gradient" id="mouseGradient" aria-hidden="true"></div>
+
+        <div class="hero-content">
+            <div class="logo" role="img" aria-label="CliGool Logo" tabindex="0">🚀</div>
+            <h1 id="hero-title">CliGool</h1>
+            <p class="tagline">随时随地访问你的终端 • 简单 • 安全 • 高效</p>
+
+            <div class="features-grid" role="list">
+                <div class="feature-item" role="listitem" tabindex="0">
+                    <span class="feature-icon" role="img" aria-label="跨平台图标">🌍</span>
+                    <div class="feature-title">跨平台</div>
+                    <div class="feature-desc">支持所有主流操作系统</div>
+                </div>
+                <div class="feature-item" role="listitem" tabindex="0">
+                    <span class="feature-icon" role="img" aria-label="安全连接图标">🔒</span>
+                    <div class="feature-title">安全连接</div>
+                    <div class="feature-desc">WebSocket加密传输</div>
+                </div>
+                <div class="feature-item" role="listitem" tabindex="0">
+                    <span class="feature-icon" role="img" aria-label="高性能图标">⚡</span>
+                    <div class="feature-title">高性能</div>
+                    <div class="feature-desc">低延迟实时响应</div>
+                </div>
+                <div class="feature-item" role="listitem" tabindex="0">
+                    <span class="feature-icon" role="img" aria-label="易用性图标">💎</span>
+                    <div class="feature-title">易用性</div>
+                    <div class="feature-desc">开箱即用无需配置</div>
+                </div>
+            </div>
+
+            <a href="#downloads" class="cta-button" role="button">
+                <span>立即开始使用</span>
+                <span aria-hidden="true">→</span>
+            </a>
+        </div>
+    </section>
+
+    <!-- Downloads Section -->
+    <section class="downloads-section" id="downloads" aria-labelledby="downloads-title">
+        <div class="section-header">
+            <h2 id="downloads-title">📥 选择你的平台</h2>
+            <p>CliGool 支持6个主流平台架构，自动识别你的系统版本</p>
+        </div>
+
+        <div class="downloads-grid">
+            <!-- Windows x64 -->
+            <article class="download-card" tabindex="0">
+                <span class="platform-icon" role="img" aria-label="Windows平台">🪟</span>
+                <h3 class="download-title">
+                    Windows
+                    <span class="badge badge-popular">热门</span>
+                </h3>
+                <div class="download-info">
+                    Windows 10/11 (64位)<br>
+                    Intel/AMD 处理器
+                </div>
+                <a href="/downloads/cligool-windows-amd64.zip?v=202603061939"
+                   class="download-button"
+                   download
+                   aria-label="下载 Windows x64 版本">
+                    <span>⬇️ 下载 Windows x64</span>
+                </a>
+            </article>
+
+            <!-- Windows ARM64 -->
+            <article class="download-card" tabindex="0">
+                <span class="platform-icon" role="img" aria-label="Windows ARM平台">🪟</span>
+                <h3 class="download-title">Windows ARM</h3>
+                <div class="download-info">
+                    Windows 10/11 ARM<br>
+                    Surface Pro X 等设备
+                </div>
+                <a href="/downloads/cligool-windows-arm64.zip?v=202603061939"
+                   class="download-button"
+                   download
+                   aria-label="下载 Windows ARM 版本">
+                    <span>⬇️ 下载 Windows ARM</span>
+                </a>
+            </article>
+
+            <!-- Linux x64 -->
+            <article class="download-card" tabindex="0">
+                <span class="platform-icon" role="img" aria-label="Linux平台">🐧</span>
+                <h3 class="download-title">Linux x64</h3>
+                <div class="download-info">
+                    Ubuntu、Debian、CentOS<br>
+                    64位服务器/桌面
+                </div>
+                <a href="/downloads/cligool-linux-amd64?v=202603061939"
+                   class="download-button"
+                   download
+                   aria-label="下载 Linux x64 版本">
+                    <span>⬇️ 下载 Linux x64</span>
+                </a>
+            </article>
+
+            <!-- Linux ARM64 -->
+            <article class="download-card" tabindex="0">
+                <span class="platform-icon" role="img" aria-label="Linux ARM平台">🐧</span>
+                <h3 class="download-title">
+                    Linux ARM
+                    <span class="badge badge-new">新</span>
+                </h3>
+                <div class="download-info">
+                    树莓派 4/5、ARM服务器<br>
+                    64位ARM系统
+                </div>
+                <a href="/downloads/cligool-linux-arm64?v=202603061939"
+                   class="download-button"
+                   download
+                   aria-label="下载 Linux ARM 版本">
+                    <span>⬇️ 下载 Linux ARM</span>
+                </a>
+            </article>
+
+            <!-- macOS Intel -->
+            <article class="download-card" tabindex="0">
+                <span class="platform-icon" role="img" aria-label="macOS平台">🍎</span>
+                <h3 class="download-title">macOS Intel</h3>
+                <div class="download-info">
+                    macOS 10.15+<br>
+                    Intel 处理器
+                </div>
+                <a href="/downloads/cligool-darwin-amd64?v=202603061939"
+                   class="download-button"
+                   download
+                   aria-label="下载 macOS Intel 版本">
+                    <span>⬇️ 下载 macOS Intel</span>
+                </a>
+            </article>
+
+            <!-- macOS ARM64 -->
+            <article class="download-card" tabindex="0">
+                <span class="platform-icon" role="img" aria-label="macOS ARM平台">🍎</span>
+                <h3 class="download-title">
+                    macOS ARM
+                    <span class="badge badge-hot">M系列</span>
+                </h3>
+                <div class="download-info">
+                    macOS 11.0+<br>
+                    Apple Silicon (M1/M2/M3)
+                </div>
+                <a href="/downloads/cligool-darwin-arm64?v=202603061939"
+                   class="download-button"
+                   download
+                   aria-label="下载 macOS ARM 版本">
+                    <span>⬇️ 下载 macOS ARM</span>
+                </a>
+            </article>
+        </div>
+    </section>
+
+    <!-- Usage Section -->
+    <section class="usage-section" aria-labelledby="usage-title">
+        <div class="section-header">
+            <h2 id="usage-title">🚀 三步开始使用</h2>
+            <p>简单三步，即可在浏览器中使用远程终端</p>
+        </div>
+
+        <div class="steps-container">
+            <article class="step" tabindex="0">
+                <div class="step-number" aria-label="步骤 1">1</div>
+                <div class="step-content">
+                    <h3 class="step-title">下载并运行客户端</h3>
+                    <p class="step-desc">
+                        选择适合你操作系统的版本，下载后解压并运行客户端程序
+                    </p>
+                </div>
+            </article>
+
+            <article class="step" tabindex="0">
+                <div class="step-number" aria-label="步骤 2">2</div>
+                <div class="step-content">
+                    <h3 class="step-title">复制访问地址</h3>
+                    <p class="step-desc">
+                        客户端运行后会显示一个Web地址，复制这个地址到浏览器打开
+                    </p>
+                    <div class="code-block"
+                         role="img"
+                         aria-label="示例地址: http://localhost:8080"
+                         data-copy="http://localhost:8080"
+                         tabindex="0">
+                        http://localhost:8080
+                    </div>
+                </div>
+            </article>
+
+            <article class="step" tabindex="0">
+                <div class="step-number" aria-label="步骤 3">3</div>
+                <div class="step-content">
+                    <h3 class="step-title">开始使用终端</h3>
+                    <p class="step-desc">
+                        在浏览器中就能像本地终端一样使用，支持所有常用命令和操作
+                    </p>
+                </div>
+            </article>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer role="contentinfo">
+        <p>© 2026 CliGool - 跨平台远程终端解决方案</p>
+        <p style="font-size: var(--text-sm); opacity: 0.8;">
+            开源项目 • MIT许可证 • <a href="https://github.com" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </p>
+    </footer>
+
+    <!-- Enhanced JavaScript for Advanced Interactions -->
+    <script>
+        // Remove loading overlay when page is ready
+        window.addEventListener('load', () => {
+            document.body.classList.remove('js-loading');
+            document.body.classList.add('js-loaded');
+
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            if (loadingOverlay) {
+                setTimeout(() => {
+                    loadingOverlay.classList.add('hidden');
+                }, 300);
+            }
+        });
+
+        // Intersection Observer for scroll animations
+        const observerOptions = {
+            root: null,
+            rootMargin: '0px',
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    // Stop observing once visible
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, observerOptions);
+
+        // Observe elements
+        document.addEventListener('DOMContentLoaded', () => {
+            // Observe section headers
+            document.querySelectorAll('.section-header').forEach(el => {
+                observer.observe(el);
+            });
+
+            // Observe download cards
+            document.querySelectorAll('.download-card').forEach(el => {
+                observer.observe(el);
+            });
+
+            // Observe steps
+            document.querySelectorAll('.step').forEach(el => {
+                observer.observe(el);
+            });
+        });
+
+        // Mouse-following gradient effect (with throttling for performance)
+        const hero = document.querySelector('.hero');
+        const mouseGradient = document.getElementById('mouseGradient');
+        let ticking = false;
+
+        if (hero && mouseGradient) {
+            hero.addEventListener('mousemove', (e) => {
+                if (!ticking) {
+                    window.requestAnimationFrame(() => {
+                        const rect = hero.getBoundingClientRect();
+                        const x = e.clientX - rect.left;
+                        const y = e.clientY - rect.top;
+
+                        mouseGradient.style.left = `${x}px`;
+                        mouseGradient.style.top = `${y}px`;
+
+                        ticking = false;
+                    });
+
+                    ticking = true;
+                }
+            });
+        }
+
+        // Code block copy functionality
+        document.querySelectorAll('.code-block').forEach(block => {
+            block.addEventListener('click', async () => {
+                const textToCopy = block.getAttribute('data-copy') || block.textContent.trim();
+
+                try {
+                    await navigator.clipboard.writeText(textToCopy);
+                    block.classList.add('copied');
+
+                    // Remove the 'copied' class after animation
+                    setTimeout(() => {
+                        block.classList.remove('copied');
+                    }, 2000);
+                } catch (err) {
+                    // Fallback for older browsers
+                    const textArea = document.createElement('textarea');
+                    textArea.value = textToCopy;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+
+                    try {
+                        document.execCommand('copy');
+                        block.classList.add('copied');
+                        setTimeout(() => {
+                            block.classList.remove('copied');
+                        }, 2000);
+                    } catch (e) {
+                        console.error('无法复制文本:', e);
+                    }
+
+                    document.body.removeChild(textArea);
+                }
+            });
+
+            // Keyboard accessibility
+            block.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    block.click();
+                }
+            });
+        });
+
+        // Keyboard navigation enhancement
+        document.querySelectorAll('.feature-item, .download-card, .step').forEach(item => {
+            item.addEventListener('keydown', (e) => {
+                // Make cards/items keyboard accessible with Enter key
+                if (e.key === 'Enter') {
+                    const link = item.querySelector('a');
+                    if (link) {
+                        link.click();
+                    }
+                }
+            });
+        });
+
+        // Smooth scroll with fallback for older browsers
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+
+                    // Set focus for accessibility
+                    target.setAttribute('tabindex', '-1');
+                    target.focus();
+                }
+            });
+        });
+
+        // Performance: Pause animations when tab is not visible
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                document.body.classList.add('page-hidden');
+            } else {
+                document.body.classList.remove('page-hidden');
+            }
+        });
+
+        // Add page-hidden CSS to pause animations
+        const style = document.createElement('style');
+        style.textContent = `
+            .page-hidden .hero-orb,
+            .page-hidden .feature-item::after,
+            .page-hidden .badge-hot {
+                animation-play-state: paused;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Prefetch download links on hover for faster downloads
+        document.querySelectorAll('.download-button').forEach(link => {
+            link.addEventListener('mouseenter', () => {
+                const href = link.getAttribute('href');
+                if (href) {
+                    const prefetchLink = document.createElement('link');
+                    prefetchLink.rel = 'prefetch';
+                    prefetchLink.href = href;
+                    document.head.appendChild(prefetchLink);
+                }
+            }, { once: true });
+        });
+
+        // Lazy load images (if any are added in the future)
+        if ('IntersectionObserver' in window) {
+            const imageObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target;
+                        if (img.dataset.src) {
+                            img.src = img.dataset.src;
+                            img.removeAttribute('data-src');
+                            imageObserver.unobserve(img);
+                        }
+                    }
+                });
+            });
+
+            document.querySelectorAll('img[data-src]').forEach(img => {
+                imageObserver.observe(img);
+            });
+        }
+
+        // Console easter egg
+        console.log(
+            '%c🚀 CliGool',
+            'font-size: 24px; font-weight: bold; color: #6366f1;'
+        );
+        console.log(
+            '%c跨平台远程终端解决方案',
+            'font-size: 14px; color: #4f46e5;'
+        );
+    </script>
 </body>
 </html>
