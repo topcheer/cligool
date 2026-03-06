@@ -2334,6 +2334,18 @@
             });
         });
 
+        // Add cache-busting parameter to all download links
+        document.addEventListener('DOMContentLoaded', () => {
+            const cacheBuster = Date.now();
+            document.querySelectorAll('a[href^="/downloads/"]').forEach(link => {
+                const href = link.getAttribute('href');
+                // Remove existing v parameter if present
+                const urlWithoutV = href.replace(/\?v=\d+/, '');
+                // Add new timestamp parameter
+                link.setAttribute('href', `${urlWithoutV}?v=${cacheBuster}`);
+            });
+        });
+
         // Console easter egg
         console.log(
             '%c🚀 CliGool',
