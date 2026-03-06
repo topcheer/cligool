@@ -92,7 +92,21 @@ func runTerminalSession(serverURL, sessionID string) error {
 	fmt.Println("⚠️  Windows模式：功能可能受限")
 	fmt.Println()
 
+	// 创建WebSocket写入channel，确保串行写入
+	wsWriteChan := make(chan []byte, 100)
+
+	// 启动WebSocket写入goroutine
+	go func() {
+		for data := range wsWriteChan {
+			if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
+				log.Printf("❌ WebSocket写入失败: %v", err)
+				return
+			}
+		}
+	}()
+
 	// 设置ping handler和心跳
+	// 注意：心跳是控制帧，直接发送，不通过channel
 	setupHeartbeat(conn)
 
 	// 发送初始化消息（工作目录和系统信息）
@@ -105,11 +119,8 @@ func runTerminalSession(serverURL, sessionID string) error {
 		OSInfo:      "windows",
 	}
 	jsonData, _ := json.Marshal(initMsg)
-	if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
-		log.Printf("❌ 发送初始化消息失败: %v", err)
-	} else {
-		log.Printf("✅ 已发送初始化消息: 工作目录=%s", wd)
-	}
+	wsWriteChan <- jsonData
+	log.Printf("✅ 已发送初始化消息: 工作目录=%s", wd)
 
 	log.Println("🔧 准备启动cmd.exe...")
 
@@ -187,9 +198,7 @@ func runTerminalSession(serverURL, sessionID string) error {
 				Source:  "local",
 			}
 			jsonData, _ := json.Marshal(msg)
-			if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
-				log.Printf("发送本地输入到WebSocket失败: %v", err)
-			}
+			wsWriteChan <- jsonData
 		}
 	}()
 
@@ -259,10 +268,7 @@ func runTerminalSession(serverURL, sessionID string) error {
 			}
 
 			jsonData, _ := json.Marshal(msg)
-			if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
-				// log.Printf("WebSocket写入失败(stderr): %v", err)
-				return
-			}
+			wsWriteChan <- jsonData
 		}
 	}()
 
@@ -295,9 +301,7 @@ func runTerminalSession(serverURL, sessionID string) error {
 		}
 
 		jsonData, _ := json.Marshal(msg)
-		if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
-			return fmt.Errorf("WebSocket写入失败: %w", err)
-		}
+		wsWriteChan <- jsonData
 	}
 }
 
