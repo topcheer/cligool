@@ -10,9 +10,9 @@ CliGool是一个三层WebSocket远程终端系统：
 ### 核心组件
 
 1. **CLI客户端** (`cmd/client/`)
-   - Windows: `main_windows.go` - 使用cmd.exe管道，需要GBK→UTF-8编码转换
+   - Windows: `main_windows.go` - 使用cmd.exe管道，需要自动检测控制台编码并转换为UTF-8
    - Unix/Linux/macOS: `main_unix.go` - 使用PTY（伪终端）
-   - 支持18个操作系统/架构组合
+   - 支持18个操作系统/架构组合（Windows 2个、Linux 8个、*BSD 6个、macOS 2个）
 
 2. **中继服务器** (`cmd/relay/`, `internal/relay/`)
    - 维护WebSocket会话和消息转发
@@ -23,6 +23,7 @@ CliGool是一个三层WebSocket远程终端系统：
 3. **Web界面** (`web/`)
    - `landing.html` - 下载页面
    - `terminal.html` - xterm.js终端界面
+   - `index.html` - 备用入口页面
 
 ### 消息流
 
@@ -63,6 +64,12 @@ docker-compose up -d relay-server
 docker-compose ps
 ```
 
+**重要提示**：
+- Windows客户端必须在Docker容器中构建（或使用交叉编译）
+- 本地macOS/Linux可以使用`./build-all.sh`构建所有*nix平台
+- Docker构建会将所有客户端打包到`web/downloads/`目录
+- Windows客户端会自动压缩为.zip文件以减少下载大小
+
 ### 服务端口
 
 - 8081: 中继服务器（主机）
@@ -73,15 +80,26 @@ docker-compose ps
 ### Windows客户端 (`main_windows.go`)
 
 - 使用`cmd.exe`管道，不是PTY
-- **必须进行GBK→UTF-8编码转换**：cmd.exe输出GBK编码，需要转换为UTF-8
+- **自动检测控制台编码**：使用`GetConsoleOutputCP()`检测code page
+  - 936: GBK（简体中文）
+  - 932: Shift-JIS（日文）
+  - 949: EUC-KR（韩文）
+  - 950: Big5（繁体中文）
+  - 1252: Windows-1252（西欧）
+  - 437: CP437（英文）
+  - 其他：默认使用Windows-1252
+- **自动转换到UTF-8**：所有输出都先转换为UTF-8再发送到WebSocket和本地终端
 - **本地终端和Web终端都显示UTF-8编码**（先转换后输出，避免本地乱码）
-- 换行符处理：`\r` → `\r\n`
+- 换行符处理：`\r` → `\r\n`（Windows标准换行符）
+- 功能限制：不支持完整的终端特性（如颜色、光标控制）
 
 ### Unix客户端 (`main_unix.go`)
 
 - 使用PTY (`github.com/creack/pty`)
 - 支持完整的终端特性（颜色、光标控制等）
 - 数据已是UTF-8，无需转换
+- 支持窗口大小动态调整（`SIGWINCH`信号处理）
+- 使用更小的缓冲区（128字节）以减少延迟
 
 ## 关键技术约束
 
@@ -109,6 +127,17 @@ wsWriteChan <- jsonData
 
 **不要使用sync.Mutex** - 这无法解决WebSocket并发写入问题。
 
+### WebSocket消息类型
+
+终端消息使用以下类型（`TerminalMessage`结构）：
+- `"init"` - 初始化消息，包含工作目录、系统信息、终端大小
+- `"input"` - 输入数据，来自用户键盘输入
+- `"output"` - 输出数据，来自终端输出
+- `"resize"` - 终端窗口大小调整
+- `"close"` - 关闭会话
+
+**重要**：心跳消息使用WebSocket控制帧（`PingMessage`/`PongMessage`），不通过上述消息类型。
+
 ### WebSocket URL构建
 
 - **CLI客户端**: `ws://host/api/terminal/{session_id}?type=client&user_id=client`
@@ -130,6 +159,41 @@ Web端user_id使用时间戳确保每次连接唯一。
 
 2. **WebSocket连接**：user_id参数使用`Date.now()`确保唯一性
 
+### Web端本地回显逻辑
+
+**关键**：Web端需要根据客户端操作系统类型决定是否本地回显：
+
+- **Windows（cmd.exe管道模式）**：
+  - 管道不会自动回显输入
+  - Web端需要立即本地回显用户输入
+  - 避免输入"消失"的体验问题
+
+- **Unix（PTY模式）**：
+  - PTY会自动回显所有输入
+  - Web端**不应该**本地回显（避免重复）
+  - 等待PTY的输出消息
+
+实现位置：`web/terminal.html`中的`terminal.onData`处理器：
+```javascript
+terminal.onData(data => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+            type: 'input',
+            data: data,
+            session: sessionId,
+            source: 'web'
+        }));
+
+        // 根据客户端操作系统类型决定是否本地回显
+        if (clientOS === 'windows') {
+            // Windows: 立即本地回显
+            terminal.write(data);
+        }
+        // Unix: 不本地回显，等待PTY回显
+    }
+});
+```
+
 ## 会话管理
 
 ### 会话状态
@@ -147,8 +211,48 @@ Web端user_id使用时间戳确保每次连接唯一。
 
 ## 开发工作流
 
+### Make命令
+
+项目使用Makefile简化常用操作：
+
+```bash
+# 构建所有组件
+make build
+
+# 构建特定组件
+make build-relay        # 中继服务器
+make build-client       # CLI客户端
+
+# 构建跨平台版本
+make build-all-platforms
+
+# 运行服务
+make run-relay          # 启动中继服务器
+make run-client         # 启动CLI客户端
+
+# Docker操作
+make docker-build       # 构建Docker镜像
+make docker-up          # 启动Docker服务
+make docker-down        # 停止Docker服务
+make docker-logs        # 查看Docker日志
+make docker-restart     # 重启Docker服务
+
+# 其他
+make test               # 运行测试
+make clean              # 清理构建文件
+make dev                # 启动开发环境
+make help               # 显示帮助信息
+```
+
+### 代码修改后的工作流
+
 1. **修改代码后**：
    ```bash
+   # 方式1：使用Make
+   make docker-build
+   make docker-up
+
+   # 方式2：直接使用docker-compose
    docker-compose build relay-server
    docker-compose up -d relay-server
    ```
@@ -160,6 +264,9 @@ Web端user_id使用时间戳确保每次连接唯一。
 
    # 或连接到远程服务器
    ./bin/cligool-darwin-arm64 -server https://your-server.com
+
+   # 指定终端大小
+   ./bin/cligool-darwin-arm64 -server http://localhost:8081 -cols 120 -rows 36
    ```
 
 3. **验证部署**：
@@ -169,6 +276,9 @@ Web端user_id使用时间戳确保每次连接唯一。
 
    # 查看日志
    docker-compose logs -f relay-server
+
+   # 查看服务状态
+   docker-compose ps
    ```
 
 ## 常见问题
@@ -177,15 +287,15 @@ Web端user_id使用时间戳确保每次连接唯一。
 
 **无输出原因**：可能在修改时删除了`os.Stdout.Write(data)`
 
-**乱码原因**：直接写入GBK编码数据到本地终端，需要先转换为UTF-8
+**乱码原因**：直接写入控制台编码数据到本地终端，需要先转换为UTF-8
 
-**解决**：在stdout/stderr读取循环中先转换GBK到UTF-8，再输出到本地终端：
+**解决**：代码已实现自动编码检测和转换。如果仍有问题：
 ```go
 // main_windows.go, stdout读取循环
 data := buf[:n]
 
-// 转换为UTF-8
-converted, err := convertGBKToUTF8(data)
+// 转换为UTF-8（自动检测控制台编码）
+converted, err := convertToUTF8(data)
 if err != nil {
     converted = string(data)
 }
@@ -217,3 +327,90 @@ wsWriteChan <- jsonData
 **原因**：下载链接URL是静态的
 
 **解决**：在`landing.html`中添加动态缓存参数（见上方示例）
+
+## 测试和调试
+
+### 本地测试脚本
+
+项目提供了多个测试脚本用于调试：
+
+```bash
+# PTY测试
+./test-pty-simple.sh        # 简单PTY测试
+./test-pty-websocket.sh     # PTY WebSocket测试
+
+# 本地终端测试
+./test-local-xterm.sh       # xterm.js本地测试
+./test-local.sh             # 本地客户端测试
+
+# 延迟测试
+./test-latency.sh           # 网络延迟测试
+
+# 完整架构测试
+./test-final-architecture.sh # 完整系统测试
+```
+
+### 调试技巧
+
+1. **启用详细日志**：
+   ```bash
+   # 客户端启用调试模式
+   ./bin/cligool-darwin-arm64 -server http://localhost:8081 -debug
+   ```
+
+2. **浏览器控制台**：
+   - 打开开发者工具（F12）
+   - 查看Console标签的WebSocket消息
+   - 检查Network标签的WebSocket连接状态
+
+3. **服务器日志**：
+   ```bash
+   docker-compose logs -f relay-server
+   ```
+
+4. **测试WebSocket连接**：
+   ```javascript
+   // 在浏览器控制台中
+   const ws = new WebSocket('ws://localhost:8081/api/terminal/test-session?type=web&user_id=test');
+   ws.onmessage = (event) => console.log('Received:', event.data);
+   ws.onopen = () => console.log('Connected');
+   ws.onerror = (error) => console.log('Error:', error);
+   ```
+
+## 架构设计决策
+
+### 为什么使用channel而不是Mutex处理WebSocket并发写入？
+
+`gorilla/websocket`的`WriteMessage`方法不是并发安全的。使用`sync.Mutex`**无法**解决问题，因为：
+- 问题不在于代码的并发控制，而在于WebSocket连接本身的限制
+- 即使使用Mutex，多个goroutine仍然可能并发调用`WriteMessage`
+- 正确的做法是确保所有WebSocket写入都通过单个goroutine串行执行
+
+### 为什么Windows使用cmd.exe而不是PTY？
+
+Windows没有原生的PTY支持（直到Windows 10/11的Windows Terminal PTY）。使用cmd.exe管道的权衡：
+- ✅ 优点：不需要额外依赖，兼容性好
+- ❌ 缺点：不支持完整终端特性（颜色、光标控制等）
+
+未来可以考虑使用Windows 10+的ConPTY。
+
+### 为什么使用小缓冲区（128字节）？
+
+Unix客户端使用128字节缓冲区而不是常见的1024字节或更大：
+- ✅ 优点：减少延迟，数据更快发送到WebSocket
+- ✅ 优点：对于交互式终端，大多数输出都很短
+- ❌ 缺点：稍微增加系统调用次数
+
+对于远程终端场景，低延迟比高吞吐量更重要。
+
+## 相关文档
+
+- **快速开始**: `QUICKSTART.md`
+- **使用指南**: `USAGE_GUIDE.md`（英文）、`USAGE_GUIDE_CN.md`（中文）
+- **开发指南**: `docs/DEVELOPMENT.md`
+- **部署指南**: `docs/DEPLOYMENT.md`
+- **配置说明**: `docs/CONFIG.md`
+- **Windows支持**: `docs/WINDOWS_SUPPORT.md`
+- **PTY故障排除**: `docs/PTY_TROUBLESHOOTING.md`
+- **延迟优化**: `LATENCY_OPTIMIZATION.md`
+- **平台列表**: `PLATFORMS.md`

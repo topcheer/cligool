@@ -39,6 +39,7 @@ func main() {
 	sessionID := flag.String("session", "", "会话ID")
 	cols := flag.Int("cols", 80, "终端列数")
 	rows := flag.Int("rows", 24, "终端行数")
+	execCmd := flag.String("cmd", "", "直接执行的命令（如 claude, gemini 等）")
 	flag.Parse()
 
 	sid := *sessionID
@@ -50,7 +51,7 @@ func main() {
 	printHeader(sid, *serverURL)
 
 	// 启动WebSocket并运行PTY
-	if err := runTerminalSession(*serverURL, sid, *cols, *rows); err != nil {
+	if err := runTerminalSession(*serverURL, sid, *cols, *rows, *execCmd); err != nil {
 		log.Fatalf("终端会话失败: %v", err)
 	}
 }
@@ -66,7 +67,7 @@ func printHeader(sessionID, serverURL string) {
 	fmt.Println()
 }
 
-func runTerminalSession(serverURL, sessionID string, cols, rows int) error {
+func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd string) error {
 	// 建立 WebSocket 连接
 	wsURL, _ := buildWebSocketURL(serverURL, sessionID)
 	dialer := websocket.DefaultDialer
@@ -116,17 +117,24 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int) error {
 	log.Printf("✅ 已发送初始化消息: 工作目录=%s, 大小=%dx%d", wd, cols, rows)
 
 	// 创建 PTY
-	shell := os.Getenv("SHELL")
-	if shell == "" {
-		shell = "/bin/bash"
+	var command *exec.Cmd
+	if execCmd != "" {
+		// 直接执行指定的命令
+		log.Printf("直接执行命令: %s", execCmd)
+		command = exec.Command(execCmd)
+	} else {
+		// 使用默认 shell
+		shell := os.Getenv("SHELL")
+		if shell == "" {
+			shell = "/bin/bash"
+		}
+		log.Printf("使用默认shell: %s", shell)
+		command = exec.Command(shell, "-i", "-l")
 	}
-
-	// 创建命令
-	cmd := exec.Command(shell, "-i", "-l")
-	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
+	command.Env = append(os.Environ(), "TERM=xterm-256color")
 
 	// 启动PTY
-	ptmx, err := pty.Start(cmd)
+	ptmx, err := pty.Start(command)
 	if err != nil {
 		return fmt.Errorf("启动PTY失败: %w", err)
 	}

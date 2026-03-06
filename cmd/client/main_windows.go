@@ -54,6 +54,7 @@ func main() {
 	sessionID := flag.String("session", "", "会话ID")
 	cols := flag.Int("cols", 80, "终端列数")
 	rows := flag.Int("rows", 24, "终端行数")
+	execCmd := flag.String("cmd", "", "直接执行的命令（如 claude, gemini 等）")
 	flag.Parse()
 
 	sid := *sessionID
@@ -69,7 +70,7 @@ func main() {
 	log.Println("开始连接WebSocket...")
 
 	// 启动WebSocket并运行终端会话
-	if err := runTerminalSession(*serverURL, sid, *cols, *rows); err != nil {
+	if err := runTerminalSession(*serverURL, sid, *cols, *rows, *execCmd); err != nil {
 		log.Printf("终端会话失败: %v", err)
 		fmt.Printf("连接失败: %v\n", err)
 		os.Exit(1)
@@ -87,7 +88,7 @@ func printHeader(sessionID, serverURL string) {
 	fmt.Println()
 }
 
-func runTerminalSession(serverURL, sessionID string, cols, rows int) error {
+func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd string) error {
 	log.Println("开始建立WebSocket连接...")
 
 	// 建立 WebSocket 连接
@@ -141,17 +142,24 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int) error {
 	wsWriteChan <- jsonData
 	log.Printf("已发送初始化消息: 工作目录=%s, 大小=%dx%d", wd, cols, rows)
 
-	log.Println("准备启动cmd.exe...")
+	// Windows上使用cmd.exe或者用户指定的命令
+	var cmdName string
+	if execCmd != "" {
+		cmdName = execCmd
+		log.Printf("准备启动命令: %s", cmdName)
+	} else {
+		cmdName = "cmd.exe"
+		log.Println("准备启动cmd.exe...")
+	}
 
-	// Windows上使用cmd.exe而不是PTY
-	cmd := exec.Command("cmd.exe")
+	// 创建命令
+	cmd := exec.Command(cmdName)
 	// 使用交互模式以获得完整的终端体验
 	cmd.Env = append(os.Environ(),
 		"TERM=xterm-256color",
-		"CMD_QUIT=exit", // 退出命令
 	)
 	// 禁用命令行参数处理，保持交互模式
-	cmd.Args = []string{"cmd.exe"}
+	cmd.Args = []string{cmdName}
 
 	log.Println("创建输入管道...")
 	// 创建输入输出管道
