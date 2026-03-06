@@ -1,172 +1,198 @@
-# CliGool - 远程终端解决方案
+# CliGool - 跨平台远程终端解决方案
 
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://golang.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Platforms](https://img.shields.io/badge/platforms-18-blue)](#-支持的平台)
 
-一个基于Go和WebSocket的远程终端解决方案，支持多用户协作和真实PTY体验。
+一个基于Go和WebSocket的跨平台远程终端解决方案，支持18种操作系统和架构。
 
-## 🎉 架构修复完成！
+## ✨ 核心特性
 
-✅ **重大更新**：已修复JSON消息格式不匹配问题，采用Base64编码确保数据正确传递！
+- 🌍 **跨平台支持**：18个操作系统和架构（Windows、Linux、macOS、*BSD等）
+- ⚡ **低延迟**：WebSocket实时通信，毫秒级响应
+- 🔒 **安全连接**：端到端加密通信，支持HTTPS/WSS
+- 💎 **真实PTY**：完整的终端特性支持（颜色、光标控制等）
+- 👥 **多用户协作**：多人可同时连接同一终端会话
+- 🚀 **开箱即用**：Docker一键部署，无需复杂配置
+- 🎨 **现代Web界面**：基于xterm.js的专业终端UI
+- 💓 **心跳保活**：双向心跳机制，自动重连和死连接清理
 
-## 🏗️ 正确的系统架构
+## 🏗️ 系统架构
 
 ```
-用户A的电脑           中继服务器              用户B的浏览器
+CLI客户端            中继服务器              Web浏览器
 ┌──────────────┐              ┌──────────┐              ┌─────────────┐
-│ CLI客户端     │──WebSocket──▶│ 消息转发器│◀──WebSocket───│  独立HTML     │
-│ (真实PTY)     │              │          │              │  (本地文件)   │
+│ 真实PTY环境    │──WebSocket──▶│ 消息转发器│◀──WebSocket───│  xterm.js    │
+│              │              │          │              │  终端界面     │
+│ 18个平台     │              │          │              │              │
 └──────────────┘              └──────────┘              └─────────────┘
 ```
 
 **核心特点**：
-- ✅ **独立组件**：CLI客户端、中继服务器、Web界面完全分离
-- ✅ **Base64编码**：解决了消息格式兼容性问题
-- ✅ **真实PTY**：只有CLI客户端提供真实的终端环境
-- ✅ **本地Web界面**：HTML文件可以在任何地方打开使用
+- ✅ **真实PTY**：CLI客户端提供完整的终端环境
+- ✅ **消息转发**：中继服务器负责WebSocket消息路由
+- ✅ **独立界面**：Web界面基于xterm.js，支持任意浏览器
+- ✅ **会话管理**：支持会话创建、删除、列表查询
+- ✅ **数据库持久化**：PostgreSQL存储会话信息
+
+## 🌍 支持的平台
+
+### Windows (2个)
+- Windows amd64 (Intel/AMD 64位)
+- Windows arm64 (Surface Pro X等ARM设备)
+
+### Linux (8个)
+- Linux amd64 (Ubuntu、Debian、CentOS等64位系统)
+- Linux arm64 (树莓派4/5、ARM服务器)
+- Linux 386 (32位x86系统)
+- Linux arm (树莓派等32位ARM设备)
+- Linux ppc64le (PowerPC系统)
+- Linux riscv64 (RISC-V架构)
+- Linux s390x (IBM System z大型机)
+- Linux mips64le (MIPS架构)
+
+### *BSD系统 (6个)
+- FreeBSD amd64/arm64
+- OpenBSD amd64/arm64
+- NetBSD amd64
+- DragonFlyBSD amd64
+
+### macOS (2个)
+- macOS Intel (Intel处理器)
+- macOS ARM (Apple M1/M2/M3)
 
 ## 🚀 快速开始
 
-### 方法一：使用演示脚本（推荐）
+### 方法一：Docker Compose部署（推荐）
 
 ```bash
-# 一键启动完整演示环境
-./demo.sh
+# 1. 克隆仓库
+git clone https://github.com/topcheer/cligool.git
+cd cligool
 
-# 停止演示环境
-./stop-demo.sh
-```
-
-### 方法二：手动启动
-
-#### 1. 启动中继服务器
-
-```bash
-# 构建并启动所有服务
+# 2. 启动所有服务
 docker-compose up -d
 
-# 检查服务状态
+# 3. 检查服务状态
 docker-compose ps
 ```
 
-#### 2. 启动CLI客户端
+服务启动后：
+- 中继服务器：http://localhost:8081
+- 下载页面：http://localhost:8081/
+- API健康检查：http://localhost:8081/api/health
+
+### 方法二：手动构建和运行
+
+#### 1. 构建客户端
+
+```bash
+# 构建当前平台的客户端
+go build -o cligool ./cmd/client
+
+# 或交叉编译其他平台（示例：Linux amd64）
+GOOS=linux GOARCH=amd64 go build -o cligool-linux-amd64 ./cmd/client
+```
+
+#### 2. 启动中继服务器
+
+```bash
+# 使用Docker
+docker-compose up -d relay-server
+
+# 或直接运行
+go run ./cmd/relay
+```
+
+#### 3. 启动CLI客户端
 
 ```bash
 # 连接到本地服务器
-./bin/cligool-simple -server http://localhost:8081 -connect-only
+./cligool -server http://localhost:8081
 
 # 连接到远程服务器
-./bin/cligool-simple -server https://cligool.zty8.cn -connect-only
+./cligool -server https://your-domain.com
 ```
 
-#### 3. 打开Web界面
+#### 4. 访问Web界面
 
-```bash
-# 在浏览器中打开
-open web-client.html
+客户端启动后会显示：
+```
+╔═══════════════════════════════════════════════════════════╗
+║                    🚀 CliGool 远程终端                      ║
+╠═══════════════════════════════════════════════════════════╣
+║ 📋 会话ID: [会话ID]                                        ║
+║ 🌐 Web访问: http://localhost:8081/session/[会话ID]         ║
+║ 🔗 连接状态: 🟢 已连接                                     ║
+╚═══════════════════════════════════════════════════════════╝
 ```
 
-## 📋 项目结构
+在浏览器中打开显示的地址即可使用远程终端。
 
-## 🚀 功能特性
+## 📂 项目结构
 
-- ✅ 实时终端访问和控制
-- ✅ 完整的终端特性支持（颜色、光标控制等）
-- ✅ 多用户协作功能
-- ✅ 会话管理和权限控制
-- ✅ 端到端加密通信
-- ✅ Cloudflare Tunnel支持 (零配置HTTPS)
-- ✅ 容器化部署，一键启动
-
-## 🛠️ 技术栈
-
-- **中继服务**: Go + WebSocket + PostgreSQL + Redis
-- **CLI客户端**: Go
-- **Web界面**: 原生JavaScript + xterm.js
-- **部署**: Docker + Cloudflare Tunnel
-
-## 📋 核心组件
-
-### 中继服务器 (`cmd/relay/`)
-
-基于Gin框架的WebSocket中继服务器，负责：
-- 管理终端会话
-- 转发客户端消息
-- 处理多用户连接
-- 支持健康检查
-
-**启动命令**：
-```bash
-go run ./cmd/relay
-# 或使用Docker
-docker-compose up relay-server
 ```
-
-### CLI客户端 (`cmd/client/`)
-
-提供真实PTY环境的命令行客户端：
-
-**简化版** (`simple.go`)：
-```bash
-./bin/cligool-simple -server http://localhost:8081 -connect-only
+cligool/
+├── cmd/
+│   ├── relay/          # 中继服务器
+│   └── client/         # CLI客户端
+│       ├── main.go          # Unix/Linux/macOS客户端（PTY）
+│       └── main_windows.go  # Windows客户端（cmd.exe）
+├── internal/
+│   ├── relay/          # 中继服务逻辑
+│   └── database/       # 数据库层
+├── web/
+│   ├── landing.html    # 下载和介绍页面
+│   ├── terminal.html   # 终端Web界面
+│   ├── lib/           # xterm.js库文件
+│   └── downloads/     # 各平台客户端二进制文件
+├── Dockerfile         # 多平台构建
+├── docker-compose.yml # 服务编排
+└── README.md
 ```
-
-**完整版** (`main.go`)：
-```bash
-./bin/cligool-client -server http://localhost:8081 -shell /bin/bash
-```
-
-### Web界面 (`web-client.html`)
-
-独立的HTML文件，包含：
-- xterm.js终端仿真
-- WebSocket客户端
-- 完整的UI界面
-
-**特点**：
-- 单一文件，无需额外依赖
-- 可本地打开或托管到任何地方
-- 支持多终端同步
 
 ## 🔧 技术栈
 
-- **后端**：Go 1.21+, Gin框架
-- **前端**：xterm.js, 原生JavaScript
-- **数据库**：PostgreSQL 15
-- **缓存**：Redis 7
-- **容器化**：Docker, docker-compose
-- **反向代理**：Cloudflare Tunnel（可选）
+- **中继服务**：Go 1.21 + Gin + WebSocket + PostgreSQL + Redis
+- **CLI客户端**：Go + PTY (Unix) / 管道 (Windows)
+- **Web界面**：xterm.js + 原生JavaScript
+- **部署**：Docker + docker-compose
+- **反向代理**：Cloudflare Tunnel（可选，零配置HTTPS）
 
-## 📖 详细文档
-
-- [完整使用指南](USAGE_GUIDE_CN.md) - 详细的中文使用说明
-- [PTY故障排除](docs/PTY_TROUBLESHOOTING.md) - PTY相关问题解决
-
-## 🌟 使用场景
+## 📖 使用场景
 
 ### 1. 远程访问
 
 ```bash
 # 在家里的Mac上启动客户端
-./bin/cligool-simple -connect-only
+./cligool-darwin-arm64 -server https://your-server.com
 
 # 在办公室的浏览器中连接
-# 使用生成的会话ID
+# 使用生成的会话ID访问
 ```
 
 ### 2. 技术支持
 
 ```bash
 # 朋友的电脑出现问题
-# 让朋友运行客户端
+# 让朋友下载并运行对应平台的客户端
 # 你在浏览器中远程协助
 ```
 
-### 3. 团队协作
+### 3. 服务器管理
+
+```bash
+# 在Linux服务器上运行
+./cligool-linux-amd64 -server https://your-server.com
+
+# 在手机浏览器中管理服务器
+```
+
+### 4. 团队协作
 
 ```bash
 # 多人同时连接同一会话
-# 实时查看和操作
+# 实时查看和操作终端
 ```
 
 ## 🛠️ 开发指南
@@ -175,7 +201,7 @@ docker-compose up relay-server
 
 - Go 1.21+
 - Docker & Docker Compose
-- (可选) Cloudflare Tunnel
+- (可选) Cloudflare Tunnel账号
 
 ### 构建项目
 
@@ -183,12 +209,24 @@ docker-compose up relay-server
 # 构建中继服务器
 go build -o bin/relay-server ./cmd/relay
 
-# 构建CLI客户端
-go build -o bin/cligool-client ./cmd/client
-go build -o bin/cligool-simple ./cmd/client/simple.go
+# 构建当前平台的客户端
+go build -o bin/cligool ./cmd/client
 
-# 构建Docker镜像
+# 构建所有平台（使用Docker）
 docker build -t cligool-relay-server .
+```
+
+### 本地开发
+
+```bash
+# 启动依赖服务
+docker-compose up -d postgres redis
+
+# 运行中继服务器
+go run ./cmd/relay
+
+# 运行客户端
+go run ./cmd/client
 ```
 
 ## 🔍 故障排除
@@ -211,40 +249,57 @@ curl http://localhost:8081/api/health
 docker logs cligool-relay
 ```
 
-**3. PTY权限问题**
-- 在真实终端中运行（非IDE内置终端）
-- 检查 `/dev/ptmx` 权限
-- 参考 [PTY故障排除指南](docs/PTY_TROUBLESHOOTING.md)
+**3. Windows客户端输出乱码**
+- 已修复：GBK编码自动转换为UTF-8
+
+**4. 终端无响应**
+- 检查心跳机制是否正常（30秒间隔）
+- 查看浏览器控制台WebSocket连接状态
 
 ## 🚀 生产环境部署
 
-### 使用Docker
+### 使用Docker Compose
 
 ```bash
-# 构建生产镜像
-docker build -t cligool-relay:latest .
+# 启动所有服务
+docker-compose up -d
 
-# 运行容器
-docker run -d \
-  -p 8080:8080 \
-  -e DATABASE_URL=postgres://user:pass@host:5432/dbname \
-  -e REDIS_URL=redis://host:6379 \
-  --name cligool-relay \
-  cligool-relay:latest
+# 查看日志
+docker-compose logs -f
+
+# 停止服务
+docker-compose down
 ```
 
-### 使用Cloudflare Tunnel
+### 使用Cloudflare Tunnel（HTTPS）
 
-1. 复制配置文件：
-```bash
-cp cloudflare-tunnel.yml.example ~/.cloudflared/config.yml
+1. 安装cloudflared
+2. 创建隧道：`cloudflared tunnel create cligool`
+3. 配置`~/.cloudflared/config.yml`：
+```yaml
+tunnel: <your-tunnel-id>
+credentials-file: /path/to/credentials.json
+
+ingress:
+  - hostname: cligool.yourdomain.com
+    service: http://localhost:8081
+  - service: http_status:404
 ```
 
-2. 修改域名和服务地址
+4. 启动隧道：`cloudflared tunnel run`
 
-3. 启动隧道：
+### 环境变量
+
 ```bash
-cloudflared tunnel run
+# 数据库连接
+DATABASE_URL=postgres://user:pass@host:5432/cligool?sslmode=disable
+
+# Redis连接
+REDIS_URL=redis://host:6379
+
+# 服务器配置
+RELAY_HOST=0.0.0.0
+RELAY_PORT=8080
 ```
 
 ## 🤝 贡献指南
@@ -266,6 +321,7 @@ cloudflared tunnel run
 - [Gin](https://github.com/gin-gonic/gin) - Go Web框架
 - [xterm.js](https://xtermjs.org/) - 终端仿真器
 - [gorilla/websocket](https://github.com/gorilla/websocket) - WebSocket库
+- [creack/pty](https://github.com/creack/pty) - PTY库
 
 ---
 
