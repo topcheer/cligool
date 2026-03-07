@@ -1,6 +1,6 @@
 # CliGool 使用指南
 
-一个基于Go和WebSocket的跨平台远程终端解决方案，支持18种操作系统和架构。
+一个基于Go和WebSocket的跨平台远程终端解决方案，支持30种操作系统和架构。
 
 ## 🏗️ 系统架构
 
@@ -17,7 +17,7 @@ CLI客户端            中继服务器              Web浏览器
 - ✅ **真实PTY**：CLI客户端提供完整的终端环境
 - ✅ **消息转发**：中继服务器负责WebSocket消息路由
 - ✅ **独立界面**：Web界面基于xterm.js，支持任意浏览器
-- ✅ **会话管理**：支持会话创建、删除、列表查询
+- ✅ **无状态设计**：内存中维护会话，无需数据库依赖
 
 ## 🚀 快速开始
 
@@ -30,8 +30,11 @@ CLI客户端            中继服务器              Web浏览器
 git clone https://github.com/topcheer/cligool.git
 cd cligool
 
-# 启动所有服务
+# 生产环境（使用预构建镜像）
 docker-compose up -d
+
+# 或：开发环境（本地构建）
+docker-compose -f docker-compose.dev.yml up -d --build
 
 # 检查服务状态
 docker-compose ps
@@ -41,8 +44,6 @@ docker-compose ps
 ```
 NAME                STATUS
 cligool-relay       Up (healthy)
-cligool-postgres    Up
-cligool-redis       Up
 ```
 
 #### 2. 启动CLI客户端
@@ -200,21 +201,10 @@ Web界面支持自动重连：
 
 ### 会话管理
 
-```bash
-# 创建新会话
-curl -X POST http://localhost:8081/api/sessions \
-  -H "Content-Type: application/json" \
-  -d '{"owner": "user@example.com"}'
-
-# 列出所有会话
-curl http://localhost:8081/api/sessions
-
-# 获取会话详情
-curl http://localhost:8081/api/sessions/{session_id}
-
-# 删除会话
-curl -X DELETE http://localhost:8081/api/sessions/{session_id}
-```
+会话在内存中自动管理：
+- 客户端连接时自动创建会话
+- 90秒无活动后自动清理会话
+- 无需手动管理会话
 
 ## 🔍 故障排除
 
@@ -299,12 +289,6 @@ ingress:
 ### 环境变量
 
 ```bash
-# 数据库连接
-DATABASE_URL=postgres://user:pass@host:5432/cligool?sslmode=disable
-
-# Redis连接
-REDIS_URL=redis://host:6379
-
 # 服务器配置
 RELAY_HOST=0.0.0.0
 RELAY_PORT=8080

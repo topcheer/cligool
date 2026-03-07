@@ -42,54 +42,14 @@ open http://localhost:8081
 # Pull image
 docker pull ghcr.io/topcheer/cligool:latest
 
-# Run container (requires PostgreSQL and Redis first)
+# Run container
 docker run -d \
   --name cligool-relay \
   -p 8081:8080 \
-  -e DATABASE_URL=postgres://cligool:cligool123@postgres:5432/cligool?sslmode=disable \
-  -e REDIS_URL=redis://redis:6379 \
-  ghcr.io/topcheer/cligool:latest
-```
-
-### Method 3: Complete Environment (with databases)
-
-```bash
-# Create network
-docker network create cligool-network
-
-# Start PostgreSQL
-docker run -d \
-  --name cligool-postgres \
-  --network cligool-network \
-  -e POSTGRES_DB=cligool \
-  -e POSTGRES_USER=cligool \
-  -e POSTGRES_PASSWORD=cligool123 \
-  postgres:15-alpine
-
-# Start Redis
-docker run -d \
-  --name cligool-redis \
-  --network cligool-network \
-  redis:7-alpine
-
-# Start CliGool relay server
-docker run -d \
-  --name cligool-relay \
-  --network cligool-network \
-  -p 8081:8080 \
-  -e DATABASE_URL=postgres://cligool:cligool123@cligool-postgres:5432/cligool?sslmode=disable \
-  -e REDIS_URL=redis://cligool-redis:6379 \
   ghcr.io/topcheer/cligool:latest
 ```
 
 ## ⚙️ Environment Variables
-
-### Database Configuration
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | - |
-| `REDIS_URL` | Redis connection string | - |
 
 ### Server Configuration
 
@@ -97,7 +57,6 @@ docker run -d \
 |----------|-------------|---------|
 | `RELAY_HOST` | Listening address | 0.0.0.0 |
 | `RELAY_PORT` | Listening port | 8080 |
-| `ENABLE_AUTO_HTTPS` | Auto-enable HTTPS | false |
 
 ### Example
 
@@ -105,8 +64,6 @@ docker run -d \
 docker run -d \
   --name cligool-relay \
   -p 8081:8080 \
-  -e DATABASE_URL=postgres://user:pass@host:5432/dbname?sslmode=disable \
-  -e REDIS_URL=redis://host:6379 \
   -e RELAY_HOST=0.0.0.0 \
   -e RELAY_PORT=8080 \
   ghcr.io/topcheer/cligool:latest
@@ -242,11 +199,10 @@ cligool.example.com {
 
 ## 🔒 Security Recommendations
 
-1. **Don't use default passwords in production**
-2. **Use HTTPS**: Configure reverse proxy and enable SSL
-3. **Restrict network access**: Use firewall to restrict database access
-4. **Update images regularly**: `docker pull ghcr.io/topcheer/cligool:latest`
-5. **Backup PostgreSQL data**: Regularly backup PostgreSQL data volumes
+1. **Use HTTPS**: Configure reverse proxy and enable SSL
+2. **Restrict network access**: Use firewall to restrict access
+3. **Update images regularly**: `docker pull ghcr.io/topcheer/cligool:latest`
+4. **Monitor logs**: Regularly check container logs
 
 ## 🐛 Troubleshooting
 
@@ -256,8 +212,8 @@ cligool.example.com {
 # Check logs
 docker logs cligool-relay
 
-# Check database connection
-docker exec cligool-relay ping -c 3 cligool-postgres
+# Check container status
+docker ps -a | grep cligool-relay
 ```
 
 ### Cannot access web interface
@@ -270,14 +226,14 @@ docker ps | grep cligool-relay
 sudo ufw status
 ```
 
-### Database connection failed
+### Connection Issues
 
 ```bash
-# Check database container
-docker ps | grep postgres
+# Check container status
+docker ps | grep cligool-relay
 
-# Test database connection
-docker exec cligool-relay sh -c 'apk add postgresql-client && psql $DATABASE_URL'
+# Test health endpoint
+docker exec cligool-relay wget -qO- http://localhost:8080/api/health
 ```
 
 ## 📚 More Information

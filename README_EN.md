@@ -39,8 +39,8 @@ CLI Client            Relay Server          Web Browser
 - ✅ **Real PTY**: CLI client provides a complete terminal environment
 - ✅ **Message Forwarding**: Relay server handles WebSocket message routing
 - ✅ **Independent Interface**: Web interface based on xterm.js, works with any browser
-- ✅ **Session Management**: Support for session creation, deletion, and listing
-- ✅ **Database Persistence**: PostgreSQL stores session information
+- ✅ **Stateless Design**: In-memory session management, no database required
+- ✅ **Ready to Use**: Single container deployment, minimal configuration needed
 
 ## 🌍 Supported Platforms
 
@@ -99,8 +99,11 @@ Don't want to deploy locally? Try the online demo first!
 git clone https://github.com/topcheer/cligool.git
 cd cligool
 
-# 2. Start all services
+# 2. Production environment (using pre-built image)
 docker-compose up -d
+
+# Or: Development environment (build locally)
+docker-compose -f docker-compose.dev.yml up -d --build
 
 # 3. Check service status
 docker-compose ps
@@ -108,8 +111,6 @@ docker-compose ps
 
 Services started:
 - **CliGool Relay Server**: http://localhost:8081
-- **PostgreSQL Database**: port 5432
-- **Redis Cache**: port 6379
 
 Access web interface: **http://localhost:8081**
 
@@ -119,31 +120,10 @@ Access web interface: **http://localhost:8081**
 # Pull image
 docker pull ghcr.io/topcheer/cligool:latest
 
-# Create network
-docker network create cligool-network
-
-# Start PostgreSQL
-docker run -d \
-  --name cligool-postgres \
-  --network cligool-network \
-  -e POSTGRES_DB=cligool \
-  -e POSTGRES_USER=cligool \
-  -e POSTGRES_PASSWORD=cligool123 \
-  postgres:15-alpine
-
-# Start Redis
-docker run -d \
-  --name cligool-redis \
-  --network cligool-network \
-  redis:7-alpine
-
-# Start CliGool relay server
+# Run relay server
 docker run -d \
   --name cligool-relay \
-  --network cligool-network \
   -p 8081:8080 \
-  -e DATABASE_URL=postgres://cligool:cligool123@cligool-postgres:5432/cligool?sslmode=disable \
-  -e REDIS_URL=redis://cligool-redis:6379 \
   ghcr.io/topcheer/cligool:latest
 ```
 
@@ -157,12 +137,9 @@ cd cligool
 # 2. Build relay server
 go build -o relay-server ./cmd/relay
 
-# 3. Start PostgreSQL and Redis
-docker-compose up -d postgres redis
-
-# 4. Run relay server
-export DATABASE_URL=postgres://cligool:cligool123@localhost:5432/cligool?sslmode=disable
-export REDIS_URL=redis://localhost:6379
+# 3. Run relay server
+export RELAY_HOST=0.0.0.0
+export RELAY_PORT=8080
 ./relay-server
 ```
 
@@ -243,11 +220,8 @@ Configuration priority: `./cligool.json` → `~/.cligool.json` → auto-create `
 
 ### Environment Variables
 
-- `DATABASE_URL`: PostgreSQL connection string
-- `REDIS_URL`: Redis connection string
 - `RELAY_HOST`: Server listening address (default: 0.0.0.0)
 - `RELAY_PORT`: Server listening port (default: 8080)
-- `ENABLE_AUTO_HTTPS`: Auto-enable HTTPS (default: false)
 
 ### Command Line Options
 
@@ -296,8 +270,7 @@ open http://localhost:8081
 ### Prerequisites
 
 - Go 1.24+
-- PostgreSQL 15+
-- Redis 7+
+- Docker & Docker Compose (for containerized deployment)
 
 ### Build Relay Server
 

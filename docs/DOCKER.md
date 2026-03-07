@@ -42,54 +42,14 @@ open http://localhost:8081
 # 拉取镜像
 docker pull ghcr.io/topcheer/cligool:latest
 
-# 运行容器（需要先启动PostgreSQL和Redis）
+# 运行容器
 docker run -d \
   --name cligool-relay \
   -p 8081:8080 \
-  -e DATABASE_URL=postgres://cligool:cligool123@postgres:5432/cligool?sslmode=disable \
-  -e REDIS_URL=redis://redis:6379 \
-  ghcr.io/topcheer/cligool:latest
-```
-
-### 方法3：完整环境（包含数据库）
-
-```bash
-# 创建网络
-docker network create cligool-network
-
-# 启动PostgreSQL
-docker run -d \
-  --name cligool-postgres \
-  --network cligool-network \
-  -e POSTGRES_DB=cligool \
-  -e POSTGRES_USER=cligool \
-  -e POSTGRES_PASSWORD=cligool123 \
-  postgres:15-alpine
-
-# 启动Redis
-docker run -d \
-  --name cligool-redis \
-  --network cligool-network \
-  redis:7-alpine
-
-# 启动CliGool中继服务器
-docker run -d \
-  --name cligool-relay \
-  --network cligool-network \
-  -p 8081:8080 \
-  -e DATABASE_URL=postgres://cligool:cligool123@cligool-postgres:5432/cligool?sslmode=disable \
-  -e REDIS_URL=redis://cligool-redis:6379 \
   ghcr.io/topcheer/cligool:latest
 ```
 
 ## ⚙️ 环境变量
-
-### 数据库配置
-
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `DATABASE_URL` | PostgreSQL连接字符串 | - |
-| `REDIS_URL` | Redis连接字符串 | - |
 
 ### 服务器配置
 
@@ -97,7 +57,6 @@ docker run -d \
 |------|------|--------|
 | `RELAY_HOST` | 监听地址 | 0.0.0.0 |
 | `RELAY_PORT` | 监听端口 | 8080 |
-| `ENABLE_AUTO_HTTPS` | 自动启用HTTPS | false |
 
 ### 示例
 
@@ -105,8 +64,6 @@ docker run -d \
 docker run -d \
   --name cligool-relay \
   -p 8081:8080 \
-  -e DATABASE_URL=postgres://user:pass@host:5432/dbname?sslmode=disable \
-  -e REDIS_URL=redis://host:6379 \
   -e RELAY_HOST=0.0.0.0 \
   -e RELAY_PORT=8080 \
   ghcr.io/topcheer/cligool:latest
@@ -242,11 +199,10 @@ cligool.example.com {
 
 ## 🔒 安全建议
 
-1. **不要在生产环境使用默认密码**
-2. **使用HTTPS**：配置反向代理并启用SSL
-3. **限制网络访问**：使用防火墙限制数据库访问
-4. **定期更新镜像**：`docker pull ghcr.io/topcheer/cligool:latest`
-5. **备份PostgreSQL数据**：定期备份PostgreSQL数据卷
+1. **使用HTTPS**：配置反向代理并启用SSL
+2. **限制网络访问**：使用防火墙限制访问
+3. **定期更新镜像**：`docker pull ghcr.io/topcheer/cligool:latest`
+4. **监控日志**：定期检查容器日志
 
 ## 🐛 故障排除
 
@@ -256,8 +212,8 @@ cligool.example.com {
 # 检查日志
 docker logs cligool-relay
 
-# 检查数据库连接
-docker exec cligool-relay ping -c 3 cligool-postgres
+# 检查容器状态
+docker ps -a | grep cligool-relay
 ```
 
 ### 无法访问Web界面
@@ -270,14 +226,14 @@ docker ps | grep cligool-relay
 sudo ufw status
 ```
 
-### 数据库连接失败
+### 连接问题
 
 ```bash
-# 检查数据库容器
-docker ps | grep postgres
+# 检查容器状态
+docker ps | grep cligool-relay
 
-# 测试数据库连接
-docker exec cligool-relay sh -c 'apk add pgadmin && psql $DATABASE_URL'
+# 检查网络连接
+docker exec cligool-relay wget -qO- http://localhost:8080/api/health
 ```
 
 ## 📚 更多信息

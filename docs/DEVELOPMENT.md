@@ -44,9 +44,7 @@ cligool/
 ├── internal/              # 内部包
 │   ├── relay/             # 中继服务逻辑
 │   ├── client/            # 客户端逻辑
-│   ├── terminal/          # 终端处理
-│   ├── auth/              # 认证授权
-│   └── database/          # 数据库操作
+│   └── terminal/          # 终端处理
 ├── web/                   # Web界面
 │   ├── dist/             # 构建产物
 │   └── index.html        # 主页面
@@ -100,14 +98,14 @@ cligool/
 - Shell配置
 - 终端大小管理
 
-### 4. 数据库 (Database)
+### 4. 会话管理 (Session Management)
 
-**位置**: `internal/database/`
+**位置**: `internal/relay/`
 
 **功能**:
-- PostgreSQL操作
-- Redis缓存
-- 数据模型定义
+- 内存中维护会话状态
+- WebSocket连接管理
+- 心跳检测和自动清理
 
 ## 🔄 开发工作流
 
@@ -292,9 +290,8 @@ curl http://localhost:8080/api/sessions
 
 1. 在 `cmd/relay/main.go` 中添加路由
 2. 在 `internal/relay/` 中实现处理函数
-3. 添加数据库操作（如需要）
-4. 编写测试
-5. 更新API文档
+3. 编写测试
+4. 更新API文档
 
 ### 添加WebSocket消息类型
 
@@ -304,13 +301,12 @@ curl http://localhost:8080/api/sessions
 4. 添加错误处理
 5. 测试消息流程
 
-### 修改数据库Schema
+### 修改会话管理逻辑
 
-1. 在 `database.go` 中更新迁移脚本
-2. 更新数据模型
-3. 修改相关查询函数
-4. 测试数据库迁移
-5. 更新API文档
+1. 在 `internal/relay/relay.go` 中修改会话处理
+2. 更新WebSocket消息处理
+3. 测试会话创建和清理
+4. 更新相关文档
 
 ## 📝 文档维护
 

@@ -12,7 +12,7 @@ CliGool是一个三层WebSocket远程终端系统：
 1. **CLI客户端** (`cmd/client/`)
    - Windows: `main_windows.go` - 使用ConPTY（Windows Console Pseudo Terminal）
    - Unix/Linux/macOS: `main_unix.go` - 使用PTY（伪终端）
-   - 支持18个操作系统/架构组合（Windows 2个、Linux 8个、*BSD 6个、macOS 2个）
+   - 支持30个操作系统/架构组合（Windows 2个、Linux 13个、*BSD 12个、macOS 2个）
    - 支持 `-cmd` 参数直接执行AI CLI工具
    - 支持 `-args` 参数传递命令行参数
 
@@ -20,7 +20,7 @@ CliGool是一个三层WebSocket远程终端系统：
    - 维护WebSocket会话和消息转发
    - 每个session可以有多个Web客户端连接
    - 最多一个CLI客户端连接（控制真实PTY）
-   - PostgreSQL存储会话信息，Redis用于缓存
+   - 内存中维护会话状态，无数据库依赖
 
 3. **Web界面** (`web/`)
    - `landing.html` - 下载页面
@@ -46,10 +46,10 @@ CLI客户端 ──WebSocket──> 中继服务器 <──WebSocket─── We
 ### 构建命令
 
 ```bash
-# Docker构建（包含所有18个平台客户端）
+# Docker构建（包含所有30个平台客户端）
 docker-compose build relay-server
 
-# 本地构建所有*nix平台客户端（16个，不含Windows）
+# 本地构建所有*nix平台客户端（29个，含Windows）
 ./build-all.sh
 
 # 本地构建特定平台

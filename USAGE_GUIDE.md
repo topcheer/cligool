@@ -41,8 +41,6 @@ docker-compose ps
 ```
 NAME                STATUS
 cligool-relay       Up (healthy)
-cligool-postgres    Up
-cligool-redis       Up
 ```
 
 #### 2. Start CLI Client
@@ -187,21 +185,10 @@ Web interface supports auto-reconnection:
 
 ### Session Management
 
-```bash
-# Create new session
-curl -X POST http://localhost:8081/api/sessions \
-  -H "Content-Type: application/json" \
-  -d '{"owner": "user@example.com"}'
-
-# List all sessions
-curl http://localhost:8081/api/sessions
-
-# Get session details
-curl http://localhost:8081/api/sessions/{session_id}
-
-# Delete session
-curl -X DELETE http://localhost:8081/api/sessions/{session_id}
-```
+Sessions are managed automatically in-memory:
+- Sessions are created when a client connects
+- Sessions are cleaned up after 90 seconds of inactivity
+- No manual session management required
 
 ## 🔍 Troubleshooting
 
@@ -286,12 +273,6 @@ ingress:
 ### Environment Variables
 
 ```bash
-# Database connection
-DATABASE_URL=postgres://user:pass@host:5432/cligool?sslmode=disable
-
-# Redis connection
-REDIS_URL=redis://host:6379
-
 # Server configuration
 RELAY_HOST=0.0.0.0
 RELAY_PORT=8080

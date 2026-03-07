@@ -2,16 +2,16 @@
 
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://golang.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Platforms](https://img.shields.io/badge/platforms-18-blue)](#-支持的平台)
+[![Platforms](https://img.shields.io/badge/platforms-30-blue)](#-支持的平台)
 [![Demo](https://img.shields.io/badge/demo-online-success.svg)](https://cligool.zty8.cn/)
 
-一个基于Go和WebSocket的跨平台远程终端解决方案，支持18种操作系统和架构。
+一个基于Go和WebSocket的跨平台远程终端解决方案，支持30种操作系统和架构。
 
 **[🚀 在线体验](https://cligool.zty8.cn/)** | **[📥 下载客户端](https://cligool.zty8.cn/)**
 
 ## ✨ 核心特性
 
-- 🌍 **跨平台支持**：18个操作系统和架构（Windows、Linux、macOS、*BSD等）
+- 🌍 **跨平台支持**：30个操作系统和架构（Windows、Linux、macOS、*BSD等）
 - ⚡ **低延迟**：WebSocket实时通信，毫秒级响应
 - 🔒 **安全连接**：端到端加密通信，支持HTTPS/WSS
 - 💎 **真实PTY**：完整的终端特性支持（颜色、光标控制等）
@@ -37,8 +37,8 @@ CLI客户端            中继服务器              Web浏览器
 - ✅ **真实PTY**：CLI客户端提供完整的终端环境
 - ✅ **消息转发**：中继服务器负责WebSocket消息路由
 - ✅ **独立界面**：Web界面基于xterm.js，支持任意浏览器
-- ✅ **会话管理**：支持会话创建、删除、列表查询
-- ✅ **数据库持久化**：PostgreSQL存储会话信息
+- ✅ **无状态设计**：内存中维护会话，无需数据库依赖
+- ✅ **开箱即用**：单容器部署，无需复杂配置
 
 ## 🌍 支持的平台
 
@@ -92,8 +92,11 @@ CLI客户端            中继服务器              Web浏览器
 git clone https://github.com/topcheer/cligool.git
 cd cligool
 
-# 2. 启动所有服务
+# 2. 生产环境（使用预构建镜像）
 docker-compose up -d
+
+# 或：开发环境（本地构建）
+docker-compose -f docker-compose.dev.yml up -d --build
 
 # 3. 检查服务状态
 docker-compose ps
@@ -180,21 +183,21 @@ cligool/
 │       ├── main_unix.go     # Unix/Linux/macOS客户端（PTY）
 │       └── main_windows.go  # Windows客户端（ConPTY）
 ├── internal/
-│   ├── relay/          # 中继服务逻辑
-│   └── database/       # 数据库层
+│   └── relay/          # 中继服务逻辑
 ├── web/
 │   ├── landing.html    # 下载和介绍页面
 │   ├── terminal.html   # 终端Web界面
 │   ├── lib/           # xterm.js库文件
 │   └── downloads/     # 各平台客户端二进制文件
-├── Dockerfile         # 多平台构建
-├── docker-compose.yml # 服务编排
+├── Dockerfile.multiarch  # 多平台构建
+├── docker-compose.yml     # 生产环境配置
+├── docker-compose.dev.yml # 开发环境配置
 └── README.md
 ```
 
 ## 🔧 技术栈
 
-- **中继服务**：Go 1.21 + Gin + WebSocket + PostgreSQL + Redis
+- **中继服务**：Go 1.21 + Gin + WebSocket
 - **CLI客户端**：Go + PTY (Unix/macOS/Linux) / ConPTY (Windows)
 - **Web界面**：xterm.js + 原生JavaScript
 - **部署**：Docker + docker-compose
@@ -300,14 +303,14 @@ docker build -t cligool-relay-server .
 ### 本地开发
 
 ```bash
-# 启动依赖服务
-docker-compose up -d postgres redis
+# 使用开发环境配置启动服务
+docker-compose -f docker-compose.dev.yml up -d --build
 
-# 运行中继服务器
-go run ./cmd/relay
-
-# 运行客户端
+# 运行客户端（另开终端）
 go run ./cmd/client
+
+# 查看日志
+docker-compose -f docker-compose.dev.yml logs -f relay-server
 ```
 
 ## 🔍 故障排除
@@ -372,12 +375,6 @@ ingress:
 ### 环境变量
 
 ```bash
-# 数据库连接
-DATABASE_URL=postgres://user:pass@host:5432/cligool?sslmode=disable
-
-# Redis连接
-REDIS_URL=redis://host:6379
-
 # 服务器配置
 RELAY_HOST=0.0.0.0
 RELAY_PORT=8080
