@@ -1,0 +1,26 @@
+name: cligool-relay
+region: sg
+services:
+  - name: relay-server
+    type: web
+    dockerfile: Dockerfile.koyeb
+    ports:
+      - port: 8080
+        protocol: TCP
+        path: /api/health
+    health_check:
+      protocol: tcp
+      port: 8080
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    env:
+      - name: RELAY_HOST
+        value: 0.0.0.0
+      - name: RELAY_PORT
+        value: "8080"
+    instance_type:
+      cloud: aws
+      type: nano
+    min_instances: 1
+    max_instances: 1
