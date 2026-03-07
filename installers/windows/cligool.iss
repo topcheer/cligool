@@ -35,12 +35,7 @@ PrivilegesRequiredOverridesAllowed=commandline
 UninstallDisplayIcon={app}\cligool-windows-amd64.exe
 
 ; 版本信息
-#if Len({#AppVersion}) > 0
-  #define VersionStr {#AppVersion}
-#else
-  #define VersionStr "1.0.0"
-#endif
-VersionInfoVersion={#VersionStr}.0
+VersionInfoVersion={#AppVersion}.0
 VersionInfoCompany=CliGool
 VersionInfoDescription=CliGool 远程终端安装程序
 VersionInfoCopyright=Copyright (C) 2024
