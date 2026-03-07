@@ -15,10 +15,12 @@
 - ⚡ **低延迟**：WebSocket实时通信，毫秒级响应
 - 🔒 **安全连接**：端到端加密通信，支持HTTPS/WSS
 - 💎 **真实PTY**：完整的终端特性支持（颜色、光标控制等）
+- 🤖 **AI CLI工具**：完美支持Claude、Gemini、Aider等AI CLI工具
 - 👥 **多用户协作**：多人可同时连接同一终端会话
 - 🚀 **开箱即用**：Docker一键部署，无需复杂配置
 - 🎨 **现代Web界面**：基于xterm.js的专业终端UI
 - 💓 **心跳保活**：双向心跳机制，自动重连和死连接清理
+- 🖥️ **Windows ConPTY**：Windows版本使用ConPTY，功能与Unix完全对等
 
 ## 🏗️ 系统架构
 
@@ -127,11 +129,17 @@ go run ./cmd/relay
 #### 3. 启动CLI客户端
 
 ```bash
-# 连接到本地服务器
+# 使用默认shell连接到本地服务器
 ./cligool -server http://localhost:8081
 
 # 连接到远程服务器
 ./cligool -server https://your-domain.com
+
+# 运行AI CLI工具（如Claude）
+./cligool -cmd claude -server https://your-domain.com
+
+# 运行带参数的命令
+./cligool -cmd git -args "status" -server https://your-domain.com
 ```
 
 #### 4. 访问Web界面
@@ -156,8 +164,8 @@ cligool/
 ├── cmd/
 │   ├── relay/          # 中继服务器
 │   └── client/         # CLI客户端
-│       ├── main.go          # Unix/Linux/macOS客户端（PTY）
-│       └── main_windows.go  # Windows客户端（cmd.exe）
+│       ├── main_unix.go     # Unix/Linux/macOS客户端（PTY）
+│       └── main_windows.go  # Windows客户端（ConPTY）
 ├── internal/
 │   ├── relay/          # 中继服务逻辑
 │   └── database/       # 数据库层
@@ -174,14 +182,36 @@ cligool/
 ## 🔧 技术栈
 
 - **中继服务**：Go 1.21 + Gin + WebSocket + PostgreSQL + Redis
-- **CLI客户端**：Go + PTY (Unix) / 管道 (Windows)
+- **CLI客户端**：Go + PTY (Unix/macOS/Linux) / ConPTY (Windows)
 - **Web界面**：xterm.js + 原生JavaScript
 - **部署**：Docker + docker-compose
 - **反向代理**：Cloudflare Tunnel（可选，零配置HTTPS）
 
+**关键技术特性**：
+- Windows ConPTY：完整的伪终端支持，功能与Unix版本完全对等
+- 自动编码检测：Windows自动检测并转换为UTF-8
+- 动态窗口大小：Unix (SIGWINCH) / Windows (监控)
+- AI CLI工具支持：完美支持Claude、Gemini、Aider等工具
+
 ## 📖 使用场景
 
-### 1. 远程访问
+### 1. AI CLI工具远程访问
+
+```bash
+# 在家里的Mac上启动Claude CLI
+./cligool-darwin-arm64 -cmd claude -server https://your-server.com
+
+# 在办公室的浏览器中继续使用Claude
+# 使用生成的会话ID访问
+
+# 运行Gemini CLI
+./cligool-linux-amd64 -cmd gemini -server https://your-server.com
+
+# 运行带参数的命令
+./cligool-darwin-arm64 -cmd git -args "commit -m 'fix bug'" -server https://your-server.com
+```
+
+### 2. 远程访问
 
 ```bash
 # 在家里的Mac上启动客户端
@@ -191,7 +221,7 @@ cligool/
 # 使用生成的会话ID访问
 ```
 
-### 2. 技术支持
+### 3. 技术支持
 
 ```bash
 # 朋友的电脑出现问题
@@ -199,7 +229,7 @@ cligool/
 # 你在浏览器中远程协助
 ```
 
-### 3. 服务器管理
+### 4. 服务器管理
 
 ```bash
 # 在Linux服务器上运行
@@ -208,12 +238,30 @@ cligool/
 # 在手机浏览器中管理服务器
 ```
 
-### 4. 团队协作
+### 5. 团队协作
 
 ```bash
 # 多人同时连接同一会话
 # 实时查看和操作终端
 ```
+
+### 6. AI CLI工具使用
+
+```bash
+# 运行Claude CLI
+./cligool-darwin-arm64 -cmd claude -server https://your-domain.com
+
+# 运行带参数的命令
+./cligool-darwin-arm64 -cmd git -args "commit -m 'Add new feature'" -server https://your-domain.com
+
+# Windows运行Gemini
+cligool-windows-amd64.exe -cmd gemini -args "chat --model gemini-pro" -server https://your-domain.com
+```
+
+**详细文档**：
+- [命令行参数使用](CMD_ARGS_USAGE.md)
+- [AI CLI工具指南](docs/AI_CLI_GUIDE.md)
+- [Windows支持说明](docs/WINDOWS_SUPPORT.md)
 
 ## 🛠️ 开发指南
 
@@ -270,7 +318,7 @@ docker logs cligool-relay
 ```
 
 **3. Windows客户端输出乱码**
-- 已修复：GBK编码自动转换为UTF-8
+- 已修复：自动检测控制台编码并转换为UTF-8（ConPTY + UTF-8检查）
 
 **4. 终端无响应**
 - 检查心跳机制是否正常（30秒间隔）

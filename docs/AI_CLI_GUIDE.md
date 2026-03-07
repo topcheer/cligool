@@ -27,8 +27,11 @@
 # 运行 Aider
 ./cligool-darwin-arm64 -cmd aider
 
-# 使用自定义参数
-./cligool-darwin-arm64 -cmd "claude --model claude-3-opus-20240229"
+# 使用参数（推荐方式）
+./cligool-darwin-arm64 -cmd claude -args "--model claude-3-opus-20240229"
+
+# 多个参数
+./cligool-darwin-arm64 -cmd git -args "commit -m 'fix bug'"
 ```
 
 ### Windows
@@ -40,8 +43,11 @@ cligool-windows-amd64.exe -cmd claude
 REM 运行 Gemini CLI
 cligool-windows-amd64.exe -cmd gemini
 
-REM 使用自定义参数
-cligool-windows-amd64.exe -cmd "claude --model claude-3-opus-20240229"
+REM 使用参数（推荐方式）
+cligool-windows-amd64.exe -cmd claude -args "--model claude-3-opus-20240229"
+
+REM 多个参数
+cligool-windows-amd64.exe -cmd git -args "commit -m 'fix bug'"
 ```
 
 ## 终端能力支持
@@ -142,8 +148,8 @@ Web 端 xterm.js 配置：
 ## 性能优化建议
 
 ### 客户端选择
-- **最佳性能**: 使用原生客户端（Unix/macOS/Linux）
-- **Windows**: 使用管道模式（功能受限）
+- **最佳性能**: 使用原生客户端（Unix/macOS/Linux/Windows ConPTY）
+- **Windows**: 使用ConPTY客户端（功能与Unix完全对等）
 - **远程访问**: 使用 Web 端
 
 ### 终端大小
@@ -163,11 +169,14 @@ Web 端 xterm.js 配置：
 # 基本使用
 ./cligool-darwin-arm64 -cmd claude
 
-# 指定模型
-./cligool-darwin-arm64 -cmd "claude --model claude-3-opus-20240229"
+# 指定模型（推荐使用 -args）
+./cligool-darwin-arm64 -cmd claude -args "--model claude-3-opus-20240229"
 
 # 会话 ID
 ./cligool-darwin-arm64 -cmd claude -session my-session-123
+
+# Windows
+cligool-windows-amd64.exe -cmd claude -args "--model claude-3-opus-20240229"
 ```
 
 ### Aider
@@ -176,10 +185,10 @@ Web 端 xterm.js 配置：
 ./cligool-darwin-arm64 -cmd aider
 
 # 指定模型
-./cligool-darwin-arm64 -cmd "aider --model gpt-4"
+./cligool-darwin-arm64 -cmd aider -args "--model gpt-4"
 
 # Git 仓库
-./cligool-darwin-arm64 -cmd "aider --model gpt-4" -session aider-session
+./cligool-darwin-arm64 -cmd aider -args "--model gpt-4" -session aider-session
 ```
 
 ### Gemini CLI
@@ -188,15 +197,22 @@ Web 端 xterm.js 配置：
 ./cligool-darwin-arm64 -cmd gemini
 
 # 指定模型
-./cligool-darwin-arm64 -cmd "gemini --model gemini-pro"
+./cligool-darwin-arm64 -cmd gemini -args "--model gemini-pro"
+
+# Windows
+cligool-windows-amd64.exe -cmd gemini -args "chat --model gemini-pro"
 ```
 
 ## 技术细节
 
 ### PTY 设置
-- Unix/macOS/Linux: 使用 `github.com/creack/pty` 库
+- **Unix/macOS/Linux**: 使用 `github.com/creack/pty` 库
+- **Windows**: 使用 ConPTY (Windows Console Pseudo Terminal)
 - 终端类型: `xterm-256color`
-- 窗口大小: 可调整（默认 80x24）
+- 窗口大小:
+  - Unix: 自动检测 + SIGWINCH信号处理
+  - Windows: 自动检测 + 后台监控（每500ms）
+  - 默认: 120x80（可手动覆盖）
 
 ### 终端仿真
 - 实现了基本的终端能力查询响应

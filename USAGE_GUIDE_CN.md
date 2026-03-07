@@ -169,6 +169,19 @@ GOOS=darwin GOARCH=arm64 go build -o cligool-darwin-arm64 ./cmd/client
 # 实时查看和操作终端
 ```
 
+### 5. AI CLI工具远程使用
+
+```bash
+# 运行Claude CLI
+./cligool-darwin-arm64 -cmd claude -server https://your-server.com
+
+# 运行带参数的命令
+./cligool-darwin-arm64 -cmd git -args "commit -m '修复bug'" -server https://your-server.com
+
+# Windows运行Gemini
+cligool-windows-amd64.exe -cmd gemini -args "chat --model gemini-pro" -server https://your-server.com
+```
+
 ## 🔧 高级功能
 
 ### 心跳保活

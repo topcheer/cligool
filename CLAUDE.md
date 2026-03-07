@@ -10,9 +10,11 @@ CliGool是一个三层WebSocket远程终端系统：
 ### 核心组件
 
 1. **CLI客户端** (`cmd/client/`)
-   - Windows: `main_windows.go` - 使用cmd.exe管道，需要自动检测控制台编码并转换为UTF-8
+   - Windows: `main_windows.go` - 使用ConPTY（Windows Console Pseudo Terminal）
    - Unix/Linux/macOS: `main_unix.go` - 使用PTY（伪终端）
    - 支持18个操作系统/架构组合（Windows 2个、Linux 8个、*BSD 6个、macOS 2个）
+   - 支持 `-cmd` 参数直接执行AI CLI工具
+   - 支持 `-args` 参数传递命令行参数
 
 2. **中继服务器** (`cmd/relay/`, `internal/relay/`)
    - 维护WebSocket会话和消息转发
@@ -79,7 +81,7 @@ docker-compose ps
 
 ### Windows客户端 (`main_windows.go`)
 
-- 使用`cmd.exe`管道，不是PTY
+- 使用 **ConPTY**（Windows Console Pseudo Terminal），不是管道
 - **自动检测控制台编码**：使用`GetConsoleOutputCP()`检测code page
   - 936: GBK（简体中文）
   - 932: Shift-JIS（日文）
@@ -89,9 +91,11 @@ docker-compose ps
   - 437: CP437（英文）
   - 其他：默认使用Windows-1252
 - **自动转换到UTF-8**：所有输出都先转换为UTF-8再发送到WebSocket和本地终端
+- **UTF-8有效性检查**：使用`utf8.Valid()`避免双重编码
 - **本地终端和Web终端都显示UTF-8编码**（先转换后输出，避免本地乱码）
 - 换行符处理：`\r` → `\r\n`（Windows标准换行符）
-- 功能限制：不支持完整的终端特性（如颜色、光标控制）
+- **支持完整的终端特性**：颜色、光标控制、屏幕清除等
+- **动态窗口大小调整**：后台监控每500ms检查一次
 
 ### Unix客户端 (`main_unix.go`)
 
@@ -99,7 +103,7 @@ docker-compose ps
 - 支持完整的终端特性（颜色、光标控制等）
 - 数据已是UTF-8，无需转换
 - 支持窗口大小动态调整（`SIGWINCH`信号处理）
-- 使用更小的缓冲区（128字节）以减少延迟
+- 使用更小的缓冲区（1024字节）以减少延迟
 
 ## 关键技术约束
 
@@ -208,6 +212,52 @@ terminal.onData(data => {
 - 服务器每30秒发送ping
 - 客户端自动回复pong
 - 超过90秒无活动自动断开
+
+## 命令行参数支持
+
+### `-cmd` 参数
+
+允许直接执行指定的命令而不是默认shell：
+
+```bash
+# Unix/macOS/Linux
+./cligool-darwin-arm64 -cmd claude
+
+# Windows
+cligool-windows-amd64.exe -cmd claude
+```
+
+### `-args` 参数
+
+传递命令行参数给指定的命令：
+
+```bash
+# Unix/macOS/Linux
+./cligool-darwin-arm64 -cmd git -args "commit -m 'fix bug'"
+
+# Windows
+cligool-windows-amd64.exe -cmd git -args "status"
+```
+
+### 参数解析规则
+
+- 使用空格分隔多个参数
+- 参数会被正确传递给命令
+- Windows使用命令行字符串方式
+- Unix使用可变参数列表方式
+
+### 自动终端大小检测
+
+客户端启动时自动检测终端大小：
+- **Unix**: 使用 `pty.GetsizeFull()`
+- **Windows**: 使用 `GetConsoleScreenBufferInfo()` 或 `golang.org/x/term.GetSize()`
+- 回退值: 120x80（如果检测失败）
+
+### 动态窗口大小调整
+
+- **Unix**: `SIGWINCH` 信号处理器
+- **Windows**: 后台goroutine每500ms检查一次
+- **重要**: 调整时不输出日志（避免破坏终端布局）
 
 ## 开发工作流
 

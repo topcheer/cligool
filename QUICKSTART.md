@@ -35,10 +35,10 @@ sudo dpkg -i cloudflared-linux-amd64.deb  # Linux
 make build-client
 
 # 2. 在目标机器上启动客户端
-./bin/cligool-client -server https://your-domain.com -session test
+./bin/cligool-darwin-arm64 -server https://your-domain.com -session test
 
 # 3. 在浏览器中访问
-# https://your-domain.com/?session=test
+# https://your-domain.com/session/test
 ```
 
 ## 🎯 典型使用场景
@@ -51,28 +51,37 @@ cd cligool
 ./scripts/cloudflare-tunnel.sh  # 配置域名
 
 # 在公司/学校的电脑上
-./bin/cligool-client -server https://home.yourdomain.com -session home-pc
+./bin/cligool-darwin-arm64 -server https://home.yourdomain.com -session home-pc
 
 # 在浏览器中访问
-# https://home.yourdomain.com/?session=home-pc
+# https://home.yourdomain.com/session/home-pc
 ```
 
 ### 场景2：团队协作调试
 ```bash
 # 在服务器上
-./bin/cligool-client -server https://team.yourdomain.com -session debug-session
+./bin/cligool-linux-amd64 -server https://team.yourdomain.com -session debug-session
 
 # 团队成员访问同一URL
-# https://team.yourdomain.com/?session=debug-session
+# https://team.yourdomain.com/session/debug-session
 ```
 
 ### 场景3：教学演示
 ```bash
 # 老师的电脑
-./bin/cligool-client -server https://demo.yourdomain.com -session lecture-101
+./bin/cligool-darwin-arm64 -server https://demo.yourdomain.com -session lecture-101
 
 # 学生访问
-# https://demo.yourdomain.com/?session=lecture-101
+# https://demo.yourdomain.com/session/lecture-101
+```
+
+### 场景4：AI CLI工具协作
+```bash
+# 运行Claude CLI
+./bin/cligool-darwin-arm64 -cmd claude -server https://ai.yourdomain.com
+
+# 运行带参数的AI CLI
+./bin/cligool-linux-amd64 -cmd aider -args "--model gpt-4" -server https://ai.yourdomain.com
 ```
 
 ## 🔧 常用命令
@@ -97,17 +106,17 @@ docker-compose build
 ## 📱 客户端使用
 
 ```bash
-# 基础连接
-./bin/cligool-client -server https://your-domain.com
+# 基础连接（使用默认shell）
+./bin/cligool-darwin-arm64 -server https://your-domain.com
 
 # 指定会话ID
-./bin/cligool-client -server https://your-domain.com -session my-session
+./bin/cligool-darwin-arm64 -server https://your-domain.com -session my-session
 
-# 使用特定Shell
-./bin/cligool-client -server https://your-domain.com -shell /bin/zsh
+# 运行AI CLI工具
+./bin/cligool-darwin-arm64 -cmd claude -server https://your-domain.com
 
-# 调试模式
-./bin/cligool-client -server https://your-domain.com -debug
+# 运行带参数的命令
+./bin/cligool-darwin-arm64 -cmd git -args "status" -server https://your-domain.com
 ```
 
 ## 🌐 Web界面功能
