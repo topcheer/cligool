@@ -14,9 +14,6 @@ cligool-client
 coverage.txt
 coverage.html
 
-# Go模块
-go.sum
-
 # 环境变量
 .env
 .env.local
@@ -46,7 +43,6 @@ Thumbs.db
 
 # Cloudflare Tunnel配置
 cloudflare-tunnel.yml
-*.json
 
 # Docker
 .dockerignore
