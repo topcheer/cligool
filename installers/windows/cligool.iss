@@ -229,7 +229,7 @@ begin
     if (InstallMode = MODE_ADMIN) and (not IsAdminLoggedOn) then begin
       if MsgBox('您选择了管理员模式但当前不是管理员身份。' +
                 '将以普通用户模式继续安装。' +
-                #13#10#13#10'是否继续？',
+                '' + '' + '是否继续？',
                 mbConfirmation, MB_YESNO) = IDNO then begin
         Result := False;
       end else begin
