@@ -9,7 +9,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/google/uuid"
 )
 
 var upgrader = websocket.Upgrader{
