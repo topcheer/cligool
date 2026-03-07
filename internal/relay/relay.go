@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cligool/cligool/internal/database"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/google/uuid"
@@ -23,14 +22,14 @@ var upgrader = websocket.Upgrader{
 
 // TerminalMessage 终端消息类型
 type TerminalMessage struct {
-	Type    string `json:"type"`    // "input", "output", "resize", "close", "init"
-	Data    string `json:"data"`    // 终端数据
-	Rows    int    `json:"rows"`    // 终端行数
-	Cols    int    `json:"cols"`    // 终端列数
-	Session string `json:"session"` // 会话ID
-	UserID  string `json:"user_id"` // 用户ID
+	Type       string `json:"type"`       // "input", "output", "resize", "close", "init"
+	Data       string `json:"data"`       // 终端数据
+	Rows       int    `json:"rows"`       // 终端行数
+	Cols       int    `json:"cols"`       // 终端列数
+	Session    string `json:"session"`    // 会话ID
+	UserID     string `json:"user_id"`    // 用户ID
 	WorkingDir string `json:"working_dir,omitempty"` // 工作目录
-	OSInfo   string `json:"os_info,omitempty"`    // 操作系统信息
+	OSInfo     string `json:"os_info,omitempty"`     // 操作系统信息
 }
 
 // Session 终端会话
@@ -43,22 +42,20 @@ type Session struct {
 	ClientCon        *websocket.Conn            // CLI客户端连接
 	Mutex            sync.RWMutex
 	Active           bool
-	LastPing         time.Time    // 最后一次收到ping的时间
-	WorkingDirectory string      // 客户端当前工作目录
-	OSInfo           string      // 客户端操作系统信息
+	LastPing         time.Time // 最后一次收到ping的时间
+	WorkingDirectory string   // 客户端当前工作目录
+	OSInfo           string   // 客户端操作系统信息
 }
 
 // Service 中继服务
 type Service struct {
 	Config     Config
-	DB         *database.DB
 	Sessions   map[string]*Session
 	SessionsMu sync.RWMutex
 }
 
 // Config 服务配置
 type Config struct {
-	DB   *database.DB
 	Host string
 	Port string
 }
@@ -67,7 +64,6 @@ type Config struct {
 func NewService(config Config) *Service {
 	return &Service{
 		Config:   config,
-		DB:       config.DB,
 		Sessions: make(map[string]*Session),
 	}
 }
@@ -138,9 +134,9 @@ func (s *Service) HandleTerminalConnection(c *gin.Context) {
 		if hasInit {
 			session.Mutex.RLock()
 			initMsg := TerminalMessage{
-				Type:        "init",
-				WorkingDir:  session.WorkingDirectory,
-				OSInfo:      session.OSInfo,
+				Type:       "init",
+				WorkingDir: session.WorkingDirectory,
+				OSInfo:     session.OSInfo,
 			}
 			session.Mutex.RUnlock()
 
@@ -277,93 +273,6 @@ func (s *Service) getOrCreateSession(sessionID, owner string) *Session {
 	log.Printf("Created new session: %s", sessionID)
 
 	return session
-}
-
-// CreateSession 创建新会话
-func (s *Service) CreateSession(c *gin.Context) {
-	var req struct {
-		Owner string `json:"owner"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// 生成会话ID
-	sessionID := uuid.New().String()
-
-	// 保存到数据库
-	session := &database.Session{
-		ID:        sessionID,
-		Owner:     req.Owner,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-		Active:    false,
-	}
-
-	if err := s.DB.CreateSession(session); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create session"})
-		return
-	}
-
-	// 创建内存会话
-	s.getOrCreateSession(sessionID, req.Owner)
-
-	c.JSON(http.StatusCreated, session)
-}
-
-// GetSession 获取会话信息
-func (s *Service) GetSession(c *gin.Context) {
-	sessionID := c.Param("id")
-
-	session, err := s.DB.GetSession(sessionID)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Session not found"})
-		return
-	}
-
-	c.JSON(http.StatusOK, session)
-}
-
-// DeleteSession 删除会话
-func (s *Service) DeleteSession(c *gin.Context) {
-	sessionID := c.Param("id")
-
-	// 从内存中删除
-	s.SessionsMu.Lock()
-	if session, exists := s.Sessions[sessionID]; exists {
-		// 关闭所有连接
-		session.Mutex.Lock()
-		for _, conn := range session.Clients {
-			conn.Close()
-		}
-		if session.ClientCon != nil {
-			session.ClientCon.Close()
-		}
-		session.Mutex.Unlock()
-		delete(s.Sessions, sessionID)
-	}
-	s.SessionsMu.Unlock()
-
-	// 从数据库中删除
-	if err := s.DB.DeleteSession(sessionID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete session"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Session deleted"})
-}
-
-// ListSessions 列出所有会话
-func (s *Service) ListSessions(c *gin.Context) {
-	sessions, err := s.DB.ListSessions()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list sessions"})
-		return
-	}
-
-	c.JSON(http.StatusOK, sessions)
 }
 
 // setupPingHandler 设置ping处理器和心跳检测

@@ -10,7 +10,6 @@ primary_region = "sjc"
 [env]
   RELAY_HOST = "0.0.0.0"
   RELAY_PORT = "8080"
-  ENABLE_AUTO_HTTPS = "true"
 
 [http_service]
   internal_port = 8080
@@ -30,19 +29,3 @@ primary_region = "sjc"
 [[vm]]
   size = "shared-cpu-1x"
   memory_mb = 256
-
-# Create PostgreSQL
-[[services]]
-  protocol = "tcp"
-  internal_port = 5432
-
-  [[services.ports]]
-    port = 5432
-
-# Create Redis
-[[services]]
-  protocol = "tcp"
-  internal_port = 6379
-
-  [[services.ports]]
-    port = 6379

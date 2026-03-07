@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/cligool/cligool/internal/relay"
-	"github.com/cligool/cligool/internal/database"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
@@ -22,24 +21,8 @@ func main() {
 		log.Println("Warning: .env file not found, using environment variables")
 	}
 
-	// 初始化数据库
-	db, err := database.NewPostgresDB(
-		os.Getenv("DATABASE_URL"),
-		os.Getenv("REDIS_URL"),
-	)
-	if err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
-	}
-	defer db.Close()
-
-	// 运行数据库迁移
-	if err := db.Migrate(); err != nil {
-		log.Fatalf("Failed to run migrations: %v", err)
-	}
-
 	// 创建中继服务
 	relayService := relay.NewService(relay.Config{
-		DB:   db,
 		Host: getEnv("RELAY_HOST", "0.0.0.0"),
 		Port: getEnv("RELAY_PORT", "8080"),
 	})
@@ -84,12 +67,6 @@ func main() {
 
 		// WebSocket终端连接
 		api.GET("/terminal/:session_id", relayService.HandleTerminalConnection)
-
-		// 会话管理
-		api.POST("/sessions", relayService.CreateSession)
-		api.GET("/sessions/:id", relayService.GetSession)
-		api.DELETE("/sessions/:id", relayService.DeleteSession)
-		api.GET("/sessions", relayService.ListSessions)
 	}
 
 	// 创建服务器
@@ -125,13 +102,6 @@ func main() {
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
-	}
-	return defaultValue
-}
-
-func getEnvBool(key string, defaultValue bool) bool {
-	if value := os.Getenv(key); value != "" {
-		return value == "true" || value == "1"
 	}
 	return defaultValue
 }
