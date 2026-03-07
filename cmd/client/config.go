@@ -20,6 +20,7 @@ import (
 // Config 配置结构
 type Config struct {
 	Server string `json:"server"`
+	Proxy  string `json:"proxy,omitempty"`
 	Cols   int    `json:"cols"`
 	Rows   int    `json:"rows"`
 }
@@ -28,8 +29,9 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		Server: "https://cligool.zty8.cn",
-		Cols:   0, // 0 表示自动检测
-		Rows:   0, // 0 表示自动检测
+		Proxy:  "", // 空表示不使用代理
+		Cols:   0,  // 0 表示自动检测
+		Rows:   0,  // 0 表示自动检测
 	}
 }
 
@@ -98,11 +100,14 @@ func saveConfigFile(path string, config Config) error {
 
 // MergeWithFlags 合并配置文件和命令行参数
 // 命令行参数优先级高于配置文件
-func MergeWithFlags(config Config, server *string, cols *int, rows *int) Config {
+func MergeWithFlags(config Config, server *string, proxy *string, cols *int, rows *int) Config {
 	result := config
 
 	if server != nil && *server != "" {
 		result.Server = *server
+	}
+	if proxy != nil && *proxy != "" {
+		result.Proxy = *proxy
 	}
 	if cols != nil && *cols != 0 {
 		result.Cols = *cols

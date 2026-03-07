@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/url"
 	"os"
 	"os/exec"
@@ -22,6 +23,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"golang.org/x/net/proxy"
 	"golang.org/x/sys/windows"
 	"golang.org/x/term"
 	"golang.org/x/text/encoding"
@@ -446,12 +448,18 @@ func main() {
 	}
 
 	serverURL := flag.String("server", config.Server, "中继服务器URL")
+	proxyURL := flag.String("proxy", config.Proxy, "代理服务器地址（如 http://proxy.example.com:8080 或 socks5://proxy.example.com:1080）")
 	sessionID := flag.String("session", "", "会话ID")
 	cols := flag.Int("cols", config.Cols, "终端列数（0=自动检测）")
 	rows := flag.Int("rows", config.Rows, "终端行数（0=自动检测）")
 	execCmd := flag.String("cmd", "", "直接执行的命令（如 claude, gemini 等）")
 	execArgs := flag.String("args", "", "传递给命令的参数（可选，用空格分隔）")
 	flag.Parse()
+
+	// 显示代理信息
+	if *proxyURL != "" {
+		log.Printf("使用代理: %s", *proxyURL)
+	}
 
 	// 构建完整的命令行
 	var commandPath string
@@ -494,19 +502,19 @@ func main() {
 	log.Println("会话ID:", sid)
 
 	// 显示连接信息
-	printHeader(sid, *serverURL)
+	printHeader(sid, *serverURL, *proxyURL)
 
 	log.Println("开始连接WebSocket...")
 
 	// 启动WebSocket并运行终端会话
-	if err := runTerminalSession(*serverURL, sid, *cols, *rows, commandPath, cmdArgs); err != nil {
+	if err := runTerminalSession(*serverURL, *proxyURL, sid, *cols, *rows, commandPath, cmdArgs); err != nil {
 		log.Printf("终端会话失败: %v", err)
 		fmt.Printf("连接失败: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func printHeader(sessionID, serverURL string) {
+func printHeader(sessionID, serverURL, proxyURL string) {
 	// 清理URL，移除末尾的斜杠
 	cleanURL := strings.TrimSuffix(serverURL, "/")
 	webURL := fmt.Sprintf("%s/session/%s", cleanURL, sessionID)
@@ -516,18 +524,33 @@ func printHeader(sessionID, serverURL string) {
 	fmt.Println("╠═══════════════════════════════════════════════════════════╣")
 	fmt.Printf("║ 会话ID: %-48s ║\n", sessionID)
 	fmt.Printf("║ Web访问: %-48s ║\n", webURL)
+	if proxyURL != "" {
+		fmt.Printf("║ 代理服务器: %-46s ║\n", proxyURL)
+	}
 	fmt.Printf("║ 连接状态: %-48s ║\n", "连接中...")
 	fmt.Println("╚═══════════════════════════════════════════════════════════╝")
 	fmt.Println()
 }
 
-func runTerminalSession(serverURL, sessionID string, cols, rows int, commandPath string, cmdArgs []string) error {
+func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, commandPath string, cmdArgs []string) error {
 	log.Println("开始建立WebSocket连接...")
 
 	// 建立 WebSocket 连接
 	wsURL, _ := buildWebSocketURL(serverURL, sessionID)
+
+	// 创建拨号器
 	dialer := websocket.DefaultDialer
 	dialer.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+
+	// 如果配置了代理，使用代理拨号器
+	if proxyURL != "" {
+		proxyDialer, err := createProxyDialer(proxyURL)
+		if err != nil {
+			return fmt.Errorf("创建代理拨号器失败: %w", err)
+		}
+		dialer.NetDial = proxyDialer
+		log.Printf("已配置代理: %s", proxyURL)
+	}
 
 	log.Println("WebSocket URL:", wsURL)
 
@@ -941,4 +964,42 @@ func setupHeartbeat(conn *websocket.Conn) {
 			}
 		}
 	}()
+}
+
+// createProxyDialer 创建代理拨号器
+func createProxyDialer(proxyURL string) (func(network, addr string) (net.Conn, error), error) {
+	// 解析代理URL
+	proxy, err := url.Parse(proxyURL)
+	if err != nil {
+		return nil, fmt.Errorf("解析代理URL失败: %w", err)
+	}
+
+	// 根据代理类型创建拨号器
+	switch proxy.Scheme {
+	case "http", "https":
+		// HTTP 代理
+		proxyURI, err := url.Parse(proxyURL)
+		if err != nil {
+			return nil, fmt.Errorf("解析代理URI失败: %w", err)
+		}
+		return http.ProxyURL(proxyURI).Dial, nil
+
+	case "socks5":
+		// SOCKS5 代理
+		return createSocks5Dialer(proxy.Host)
+
+	default:
+		return nil, fmt.Errorf("不支持的代理类型: %s（支持 http、https、socks5）", proxy.Scheme)
+	}
+}
+
+// createSocks5Dialer 创建SOCKS5拨号器
+func createSocks5Dialer(proxyAddr string) (func(network, addr string) (net.Conn, error), error) {
+	// 使用 golang.org/x/net/proxy 的 socks5 拨号器
+	dialer, err := proxy.SOCKS5("tcp", proxyAddr, nil, proxy.Direct)
+	if err != nil {
+		return nil, fmt.Errorf("创建SOCKS5拨号器失败: %w", err)
+	}
+
+	return dialer.Dial, nil
 }
