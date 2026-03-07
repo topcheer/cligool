@@ -1,6 +1,6 @@
 # CliGool Platform Support
 
-This version supports **33 operating system and architecture combinations**, covering all mainstream platforms.
+This version supports **30 operating system and architecture combinations**, covering all mainstream platforms.
 
 ## 🌟 Supported Platforms
 
@@ -34,12 +34,9 @@ This version supports **33 operating system and architecture combinations**, cov
 - ✅ **freebsd-arm** - FreeBSD ARM 32-bit
 - ✅ **freebsd-riscv64** - FreeBSD RISC-V
 
-### OpenBSD (5 platforms)
+### OpenBSD (2 platforms)
 - ✅ **openbsd-amd64** - OpenBSD 64-bit
 - ✅ **openbsd-arm64** - OpenBSD ARM 64-bit
-- ✅ **openbsd-386** - OpenBSD 32-bit
-- ✅ **openbsd-arm** - OpenBSD ARM 32-bit
-- ✅ **openbsd-riscv64** - OpenBSD RISC-V
 
 ### NetBSD (4 platforms)
 - ✅ **netbsd-amd64** - NetBSD 64-bit
@@ -47,9 +44,8 @@ This version supports **33 operating system and architecture combinations**, cov
 - ✅ **netbsd-arm** - NetBSD ARM 32-bit
 - ✅ **netbsd-386** - NetBSD 32-bit
 
-### DragonFlyBSD (2 platforms)
+### DragonFlyBSD (1 platform)
 - ✅ **dragonfly-amd64** - DragonFlyBSD 64-bit
-- ✅ **dragonfly-arm64** - DragonFlyBSD ARM 64-bit
 
 ### Relay Server (1 platform)
 - ✅ **relay-server-linux-amd64** - Linux server component
@@ -62,10 +58,15 @@ This version supports **33 operating system and architecture combinations**, cov
 | macOS | 2/2 | 100% ✅ |
 | Linux | 13/13 | 100% ✅ |
 | FreeBSD | 5/5 | 100% ✅ |
-| OpenBSD | 5/5 | 100% ✅ |
+| OpenBSD | 2/5 | 40% ⚠️ |
 | NetBSD | 4/4 | 100% ✅ |
-| DragonFlyBSD | 2/2 | 100% ✅ |
-| **Total** | **33/33** | **100% ✅** |
+| DragonFlyBSD | 1/2 | 50% ⚠️ |
+| **Total** | **29/33** | **88%** |
+
+**Notes**:
+- OpenBSD only supports amd64 and arm64 (386/arm/riscv64 limited by pty library)
+- DragonFlyBSD only supports amd64 (arm64 not supported by Go)
+- Total actually supported: 30 platforms (including Windows)
 
 ## 🚀 Quick Start
 

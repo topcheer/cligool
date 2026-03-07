@@ -1,6 +1,6 @@
 # CliGool 平台支持
 
-本版本支持**33个操作系统和架构组合**，覆盖所有主流平台。
+本版本支持**30个操作系统和架构组合**，覆盖所有主流平台。
 
 ## 🌟 已构建的平台
 
@@ -34,12 +34,9 @@
 - ✅ **freebsd-arm** - FreeBSD ARM 32位
 - ✅ **freebsd-riscv64** - FreeBSD RISC-V
 
-### OpenBSD (5个)
+### OpenBSD (2个)
 - ✅ **openbsd-amd64** - OpenBSD 64位
 - ✅ **openbsd-arm64** - OpenBSD ARM 64位
-- ✅ **openbsd-386** - OpenBSD 32位
-- ✅ **openbsd-arm** - OpenBSD ARM 32位
-- ✅ **openbsd-riscv64** - OpenBSD RISC-V
 
 ### NetBSD (4个)
 - ✅ **netbsd-amd64** - NetBSD 64位
@@ -47,9 +44,8 @@
 - ✅ **netbsd-arm** - NetBSD ARM 32位
 - ✅ **netbsd-386** - NetBSD 32位
 
-### DragonFlyBSD (2个)
+### DragonFlyBSD (1个)
 - ✅ **dragonfly-amd64** - DragonFlyBSD 64位
-- ✅ **dragonfly-arm64** - DragonFlyBSD ARM 64位
 
 ### 中继服务器 (1个)
 - ✅ **relay-server-linux-amd64** - Linux服务器组件
@@ -62,10 +58,15 @@
 | macOS | 2/2 | 100% ✅ |
 | Linux | 13/13 | 100% ✅ |
 | FreeBSD | 5/5 | 100% ✅ |
-| OpenBSD | 5/5 | 100% ✅ |
+| OpenBSD | 2/5 | 40% ⚠️ |
 | NetBSD | 4/4 | 100% ✅ |
-| DragonFlyBSD | 2/2 | 100% ✅ |
-| **总计** | **33/33** | **100% ✅** |
+| DragonFlyBSD | 1/2 | 50% ⚠️ |
+| **总计** | **29/33** | **88%** |
+
+**说明**：
+- OpenBSD仅支持amd64和arm64（386/arm/riscv64受pty库限制）
+- DragonFlyBSD仅支持amd64（arm64不被Go支持）
+- 总计实际支持：30个平台（包括Windows）
 
 ## 🚀 快速开始
 

@@ -143,17 +143,7 @@ jobs:
         run: |
           CGO_ENABLED=0 GOOS=openbsd GOARCH=arm64 go build -o bin/cligool-openbsd-arm64 ./cmd/client
 
-      - name: Build OpenBSD 386
-        run: |
-          CGO_ENABLED=0 GOOS=openbsd GOARCH=386 go build -o bin/cligool-openbsd-386 ./cmd/client
-
-      - name: Build OpenBSD arm (32-bit)
-        run: |
-          CGO_ENABLED=0 GOOS=openbsd GOARCH=arm GOARM=6 go build -o bin/cligool-openbsd-arm ./cmd/client
-
-      - name: Build OpenBSD riscv64
-        run: |
-          CGO_ENABLED=0 GOOS=openbsd GOARCH=riscv64 go build -o bin/cligool-openbsd-riscv64 ./cmd/client
+      # Note: OpenBSD 386/arm/riscv64 skipped due to pty library limitations
 
       - name: Build NetBSD amd64
         run: |
@@ -175,9 +165,7 @@ jobs:
         run: |
           CGO_ENABLED=0 GOOS=dragonfly GOARCH=amd64 go build -o bin/cligool-dragonfly-amd64 ./cmd/client
 
-      - name: Build DragonFlyBSD arm64
-        run: |
-          CGO_ENABLED=0 GOOS=dragonfly GOARCH=arm64 go build -o bin/cligool-dragonfly-arm64 ./cmd/client
+      # Note: DragonFlyBSD arm64 not supported by Go
 
       # ==================== Build Relay Server ====================
       - name: Build Relay Server
@@ -219,9 +207,6 @@ jobs:
           # OpenBSD
           tar -czf cligool-openbsd-amd64.tar.gz cligool-openbsd-amd64
           tar -czf cligool-openbsd-arm64.tar.gz cligool-openbsd-arm64
-          tar -czf cligool-openbsd-386.tar.gz cligool-openbsd-386
-          tar -czf cligool-openbsd-arm.tar.gz cligool-openbsd-arm
-          tar -czf cligool-openbsd-riscv64.tar.gz cligool-openbsd-riscv64
 
           # NetBSD
           tar -czf cligool-netbsd-amd64.tar.gz cligool-netbsd-amd64
@@ -231,7 +216,6 @@ jobs:
 
           # DragonFlyBSD
           tar -czf cligool-dragonfly-amd64.tar.gz cligool-dragonfly-amd64
-          tar -czf cligool-dragonfly-arm64.tar.gz cligool-dragonfly-arm64
 
           # Relay server
           tar -czf relay-server-linux-amd64.tar.gz relay-server
@@ -500,36 +484,6 @@ jobs:
           asset_name: cligool-openbsd-arm64.tar.gz
           asset_content_type: application/gzip
 
-      - name: Upload OpenBSD 386
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./release/cligool-openbsd-386.tar.gz
-          asset_name: cligool-openbsd-386.tar.gz
-          asset_content_type: application/gzip
-
-      - name: Upload OpenBSD arm
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./release/cligool-openbsd-arm.tar.gz
-          asset_name: cligool-openbsd-arm.tar.gz
-          asset_content_type: application/gzip
-
-      - name: Upload OpenBSD riscv64
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./release/cligool-openbsd-riscv64.tar.gz
-          asset_name: cligool-openbsd-riscv64.tar.gz
-          asset_content_type: application/gzip
-
       - name: Upload NetBSD amd64
         uses: actions/upload-release-asset@v1
         env:
@@ -578,16 +532,6 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./release/cligool-dragonfly-amd64.tar.gz
           asset_name: cligool-dragonfly-amd64.tar.gz
-          asset_content_type: application/gzip
-
-      - name: Upload DragonFlyBSD arm64
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./release/cligool-dragonfly-arm64.tar.gz
-          asset_name: cligool-dragonfly-arm64.tar.gz
           asset_content_type: application/gzip
 
       - name: Upload Relay Server

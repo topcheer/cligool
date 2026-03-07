@@ -8,7 +8,7 @@ This document describes how to deploy CliGool relay server using Docker.
 
 - **GitHub Container Registry**: `ghcr.io/topcheer/cligool`
 - **Supported Architectures**: linux/amd64, linux/arm64
-- **Contents**: Relay server + client binaries for all 33 platforms
+- **Contents**: Relay server + client binaries for all 30 platforms
 
 ### Available Tags
 

@@ -8,7 +8,7 @@
 
 - **GitHub Container Registry**: `ghcr.io/topcheer/cligool`
 - **支持架构**: linux/amd64, linux/arm64
-- **包含内容**: 中继服务器 + 所有33个平台的客户端二进制文件
+- **包含内容**: 中继服务器 + 所有30个平台的客户端二进制文件
 
 ### 可用标签
 

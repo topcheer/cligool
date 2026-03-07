@@ -2,17 +2,17 @@
 
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)](https://golang.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Platforms](https://img.shields.io/badge/platforms-33-blue)](#-supported-platforms)
+[![Platforms](https://img.shields.io/badge/platforms-30-blue)](#-supported-platforms)
 [![Docker](https://img.shields.io/badge/docker-multi--arch-blue.svg)](https://ghcr.io/topcheer/cligool)
 [![Demo](https://img.shields.io/badge/demo-online-success.svg)](https://cligool.zty8.cn/)
 
-A cross-platform remote terminal solution based on Go and WebSocket, supporting 33 operating systems and architectures.
+A cross-platform remote terminal solution based on Go and WebSocket, supporting 30 operating systems and architectures.
 
 **[🚀 Live Demo](https://cligool.zty8.cn/)** | **[📥 Download Clients](https://cligool.zty8.cn/)**
 
 ## ✨ Key Features
 
-- 🌍 **Cross-Platform Support**: 33 operating systems and architectures (Windows, Linux, macOS, *BSD, etc.)
+- 🌍 **Cross-Platform Support**: 30 operating systems and architectures (Windows, Linux, macOS, *BSD, etc.)
 - ⚡ **Low Latency**: Real-time WebSocket communication with millisecond response
 - 🔒 **Secure Connection**: End-to-end encrypted communication, supporting HTTPS/WSS
 - 💎 **Real PTY**: Full terminal feature support (colors, cursor control, etc.)
@@ -31,7 +31,7 @@ CLI Client            Relay Server          Web Browser
 │ Real PTY     │──WebSocket──▶     │ Message  │◀──WebSocket───   │  xterm.js   │
 │ Environment  │                    │ Forwarder│                  │  Terminal   │
 │              │                    │          │                  │  Interface  │
-│ 33 Platforms │                    │          │                  │             │
+│ 30 Platforms │                    │          │                  │             │
 └──────────────┘                    └──────────┘                  └─────────────┘
 ```
 
@@ -63,11 +63,11 @@ CLI Client            Relay Server          Web Browser
 - Linux mips64 (MIPS 64-bit Big-Endian)
 - Linux loong64 (LoongArch)
 
-### *BSD Systems (16 platforms)
+### *BSD Systems (12 platforms)
 - FreeBSD amd64/arm64/386/arm/riscv64
-- OpenBSD amd64/arm64/386/arm/riscv64
+- OpenBSD amd64/arm64
 - NetBSD amd64/arm64/arm/386
-- DragonFlyBSD amd64/arm64
+- DragonFlyBSD amd64
 
 ### macOS (2 platforms)
 - macOS Intel (Intel processors)
