@@ -417,7 +417,7 @@ jobs:
 
       - name: Build Windows Installer
         run: |
-          $version = "${{ steps.version.outputs.version }}"
+          $version = "${{ steps.version.outputs.version }}" -replace "v", ""
           iscc /DAppVersion=$version installers\windows\cligool.iss
 
       - name: List output files
