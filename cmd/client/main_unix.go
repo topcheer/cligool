@@ -103,11 +103,15 @@ func main() {
 }
 
 func printHeader(sessionID, serverURL string) {
+	// 清理URL，移除末尾的斜杠
+	cleanURL := strings.TrimSuffix(serverURL, "/")
+	webURL := fmt.Sprintf("%s/session/%s", cleanURL, sessionID)
+
 	fmt.Println("╔═══════════════════════════════════════════════════════════╗")
 	fmt.Println("║                    🚀 CliGool 远程终端                      ║")
 	fmt.Println("╠═══════════════════════════════════════════════════════════╣")
 	fmt.Printf("║ 📋 会话ID: %-43s ║\n", sessionID)
-	fmt.Printf("║ 🌐 Web访问: %-43s ║\n", serverURL+"/session/"+sessionID)
+	fmt.Printf("║ 🌐 Web访问: %-43s ║\n", webURL)
 	fmt.Printf("║ 🔗 连接状态: %-43s ║\n", "🟡 连接中...")
 	fmt.Println("╚═══════════════════════════════════════════════════════════╝")
 	fmt.Println()
@@ -130,7 +134,8 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, commandPath
 	fmt.Println("💡 现在可以在Web终端中输入命令了")
 
 	// 发送系统通知并自动打开浏览器
-	webURL := fmt.Sprintf("%s/session/%s", serverURL, sessionID)
+	cleanURL := strings.TrimSuffix(serverURL, "/")
+	webURL := fmt.Sprintf("%s/session/%s", cleanURL, sessionID)
 	notifier := NewSystemNotifier()
 	if err := notifier.SendWebTerminalNotification(webURL); err == nil {
 		fmt.Println("📱 已发送系统通知并在浏览器中打开 Web 终端")

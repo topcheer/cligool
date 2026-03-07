@@ -507,11 +507,15 @@ func main() {
 }
 
 func printHeader(sessionID, serverURL string) {
+	// 清理URL，移除末尾的斜杠
+	cleanURL := strings.TrimSuffix(serverURL, "/")
+	webURL := fmt.Sprintf("%s/session/%s", cleanURL, sessionID)
+
 	fmt.Println("╔═══════════════════════════════════════════════════════════╗")
 	fmt.Println("║                    CliGool 远程终端                        ║")
 	fmt.Println("╠═══════════════════════════════════════════════════════════╣")
 	fmt.Printf("║ 会话ID: %-48s ║\n", sessionID)
-	fmt.Printf("║ Web访问: %-48s ║\n", serverURL+"/session/"+sessionID)
+	fmt.Printf("║ Web访问: %-48s ║\n", webURL)
 	fmt.Printf("║ 连接状态: %-48s ║\n", "连接中...")
 	fmt.Println("╚═══════════════════════════════════════════════════════════╝")
 	fmt.Println()
@@ -540,7 +544,8 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, commandPath
 	fmt.Println()
 
 	// 发送系统通知并自动打开浏览器
-	webURL := fmt.Sprintf("%s/session/%s", serverURL, sessionID)
+	cleanURL := strings.TrimSuffix(serverURL, "/")
+	webURL := fmt.Sprintf("%s/session/%s", cleanURL, sessionID)
 
 	// Windows: 使用简单的方法打开浏览器
 	go func() {
