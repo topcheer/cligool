@@ -1,9 +1,14 @@
 ; CliGool 安装程序脚本
 ; 支持普通用户和特权用户两种模式
 
+; 版本号定义（可通过 /DAppVersion=x.x.x 参数覆盖）
+#ifndef AppVersion
+  #define AppVersion "1.0.0"
+#endif
+
 [Setup]
 AppName=CliGool
-AppVersion=1.0.0
+AppVersion={#AppVersion}
 AppPublisher=CliGool
 AppPublisherURL=https://github.com/topcheer/cligool
 AppSupportURL=https://github.com/topcheer/cligool/issues
@@ -30,7 +35,7 @@ PrivilegesRequiredOverridesAllowed=commandline
 UninstallDisplayIcon={app}\cligool-windows-amd64.exe
 
 ; 版本信息
-VersionInfoVersion=1.0.0.0
+VersionInfoVersion={#AppVersion}.0
 VersionInfoCompany=CliGool
 VersionInfoDescription=CliGool 远程终端安装程序
 VersionInfoCopyright=Copyright (C) 2024
