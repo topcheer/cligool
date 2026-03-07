@@ -436,10 +436,19 @@ func main() {
 
 	log.Println("CliGool Windows客户端启动...")
 
-	serverURL := flag.String("server", "https://cligool.zty8.cn", "中继服务器URL")
+	// 加载配置文件
+	config, configPath, err := LoadConfig()
+	if err != nil {
+		log.Printf("警告: 加载配置文件失败: %v，使用默认配置", err)
+		config = DefaultConfig()
+	} else {
+		log.Printf("✅ 已加载配置文件: %s", configPath)
+	}
+
+	serverURL := flag.String("server", config.Server, "中继服务器URL")
 	sessionID := flag.String("session", "", "会话ID")
-	cols := flag.Int("cols", 0, "终端列数（0=自动检测）")
-	rows := flag.Int("rows", 0, "终端行数（0=自动检测）")
+	cols := flag.Int("cols", config.Cols, "终端列数（0=自动检测）")
+	rows := flag.Int("rows", config.Rows, "终端行数（0=自动检测）")
 	execCmd := flag.String("cmd", "", "直接执行的命令（如 claude, gemini 等）")
 	execArgs := flag.String("args", "", "传递给命令的参数（可选，用空格分隔）")
 	flag.Parse()

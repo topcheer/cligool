@@ -135,12 +135,25 @@ go run ./cmd/relay
 # 连接到远程服务器
 ./cligool -server https://your-domain.com
 
+# 使用配置文件（推荐）
+# 首次运行会自动创建 ~/.cligool.json 配置文件
+./cligool
+
 # 运行AI CLI工具（如Claude）
-./cligool -cmd claude -server https://your-domain.com
+./cligool -cmd claude
 
 # 运行带参数的命令
-./cligool -cmd git -args "status" -server https://your-domain.com
+./cligool -cmd git -args "status"
 ```
+
+**配置文件支持**：
+CliGool 支持配置文件来设置常用参数：
+- 配置文件位置：`./cligool.json` 或 `~/.cligool.json`
+- 自动创建：首次运行时自动创建 `~/.cligool.json`
+- 可配置项：`server`、`cols`、`rows`
+- 命令行参数优先级高于配置文件
+
+详见：[配置文件使用指南](CONFIG_GUIDE.md)
 
 #### 4. 访问Web界面
 
