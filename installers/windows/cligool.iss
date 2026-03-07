@@ -25,9 +25,9 @@ OutputBaseFilename=cligool-setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-WizardImageFile=installers\windows\cligool-setup.bmp
-WizardSmallImageFile=installers\windows\cligool-small.bmp
-SetupIconFile=installers\windows\cligool-icon.ico
+; WizardImageFile=cligool-setup.bmp
+; WizardSmallImageFile=cligool-small.bmp
+; SetupIconFile=cligool-icon.ico
 
 ; 权限相关
 PrivilegesRequired=admin
