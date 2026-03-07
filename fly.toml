@@ -1,0 +1,48 @@
+# fly.toml app configuration file
+# see https://fly.io/docs/reference/configuration/ for information about how to use this file.
+
+app = "cligool-relay"
+primary_region = "sjc"
+
+[build]
+  dockerfile = "Dockerfile.multiarch"
+
+[env]
+  RELAY_HOST = "0.0.0.0"
+  RELAY_PORT = "8080"
+  ENABLE_AUTO_HTTPS = "true"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "10s"
+  grace_period = "10s"
+  method = "GET"
+  path = "/api/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory_mb = 256
+
+# Create PostgreSQL
+[[services]]
+  protocol = "tcp"
+  internal_port = 5432
+
+  [[services.ports]]
+    port = 5432
+
+# Create Redis
+[[services]]
+  protocol = "tcp"
+  internal_port = 6379
+
+  [[services.ports]]
+    port = 6379
