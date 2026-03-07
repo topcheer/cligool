@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   relay-server:
     image: ghcr.io/topcheer/cligool:latest
