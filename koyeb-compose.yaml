@@ -1,0 +1,39 @@
+version: "2.0"
+
+services:
+  - name: cligool-relay
+    type: web
+    docker:
+      build_context: .
+      dockerfile: Dockerfile.multiarch
+    ports:
+      - port: 8080
+        protocol: http
+        path: /api/health
+    env:
+      - name: RELAY_HOST
+        value: 0.0.0.0
+      - name: RELAY_PORT
+        value: "8080"
+      - name: ENABLE_AUTO_HTTPS
+        value: "true"
+    regions:
+      - sin
+    instance_type: nano
+    min_instances: 1
+    max_instances: 1
+
+databases:
+  - name: cligool-postgres
+    type: postgresql
+    version: "16"
+    size: xs
+    regions:
+      - sin
+
+  - name: cligool-redis
+    type: redis
+    version: "7"
+    size: xs
+    regions:
+      - sin

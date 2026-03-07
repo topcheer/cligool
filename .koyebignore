@@ -1,0 +1,31 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# Test scripts
+test-*.sh
+validate-*.sh
+
+# Build artifacts (最重要！235MB)
+bin/
+*.exe
+*.tar.gz
+*.zip
+
+# Docker
+docker-compose.yml
+
+# CI/CD
+.github/
+
+# Other deployment configs
+fly.toml
+railway.toml
+render.yaml
+
+# Memory and cache
+.claude/
