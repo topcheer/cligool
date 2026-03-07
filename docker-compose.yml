@@ -1,9 +1,9 @@
+# 生产环境 Docker Compose 配置
+# 使用预构建的镜像（从 GitHub Container Registry）
+
 services:
   relay-server:
     image: ghcr.io/topcheer/cligool:latest
-    # 如需本地构建，取消注释以下两行并注释掉上面的image行：
-    # build:
-    #   dockerfile: Dockerfile.multiarch
     container_name: cligool-relay
     ports:
       - "8081:8080"

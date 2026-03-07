@@ -1,0 +1,27 @@
+# 本地开发环境 Docker Compose 配置
+# 自动构建镜像并启动服务
+
+services:
+  relay-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.multiarch
+    container_name: cligool-relay-dev
+    ports:
+      - "8081:8080"
+    environment:
+      - RELAY_HOST=0.0.0.0
+      - RELAY_PORT=8080
+    restart: unless-stopped
+    networks:
+      - cligool-network
+    volumes:
+      - ./logs:/app/logs
+      # 开发时可以挂载源代码目录（可选）
+      # - ./cmd:/app/cmd
+      # - ./internal:/app/internal
+      # - ./web:/app/web
+
+networks:
+  cligool-network:
+    driver: bridge
