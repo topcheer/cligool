@@ -12,7 +12,7 @@
 ### Linux
 - **安装脚本**: `linux/install.sh`
 - **安装位置**: `/usr/local/bin/cligool`
-- **支持架构**: amd64, arm64, 386, arm, ppc64le, riscv64, s390x, mips64le
+- **支持架构**: amd64, arm64, 386, arm, armbe, ppc64le, ppc64, riscv64, s390x, mips, mips64le, mips64, loong64
 - **要求**: sudo 权限
 
 ### Windows
