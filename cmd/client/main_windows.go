@@ -441,7 +441,23 @@ func main() {
 	cols := flag.Int("cols", 0, "终端列数（0=自动检测）")
 	rows := flag.Int("rows", 0, "终端行数（0=自动检测）")
 	execCmd := flag.String("cmd", "", "直接执行的命令（如 claude, gemini 等）")
+	execArgs := flag.String("args", "", "传递给命令的参数（可选，用空格分隔）")
 	flag.Parse()
+
+	// 构建完整的命令行
+	var commandPath string
+	var cmdArgs []string
+	if execCmd != "" {
+		log.Printf("准备启动命令: %s", execCmd)
+		commandPath = execCmd
+		// 解析参数
+		if execArgs != "" {
+			cmdArgs = strings.Fields(execArgs)
+		}
+	} else {
+		log.Println("准备启动cmd.exe...")
+		commandPath = "cmd.exe"
+	}
 
 	// 自动检测控制台大小
 	actualCols, actualRows, err := getConsoleSize()
@@ -474,7 +490,7 @@ func main() {
 	log.Println("开始连接WebSocket...")
 
 	// 启动WebSocket并运行终端会话
-	if err := runTerminalSession(*serverURL, sid, *cols, *rows, *execCmd); err != nil {
+	if err := runTerminalSession(*serverURL, sid, *cols, *rows, commandPath, cmdArgs); err != nil {
 		log.Printf("终端会话失败: %v", err)
 		fmt.Printf("连接失败: %v\n", err)
 		os.Exit(1)
@@ -492,7 +508,7 @@ func printHeader(sessionID, serverURL string) {
 	fmt.Println()
 }
 
-func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd string) error {
+func runTerminalSession(serverURL, sessionID string, cols, rows int, commandPath string, cmdArgs []string) error {
 	log.Println("开始建立WebSocket连接...")
 
 	// 建立 WebSocket 连接
@@ -573,16 +589,6 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 	wsWriteChan <- jsonData
 	log.Printf("已发送初始化消息: 工作目录=%s, 大小=%dx%d", wd, cols, rows)
 
-	// 确定要启动的命令
-	var commandPath string
-	if execCmd != "" {
-		log.Printf("准备启动命令: %s", execCmd)
-		commandPath = execCmd
-	} else {
-		log.Println("准备启动cmd.exe...")
-		commandPath = "cmd.exe"
-	}
-
 	// 创建ConPTY
 	log.Println("创建ConPTY...")
 	pc, err := newPseudoConsole(int16(cols), int16(rows))
@@ -653,13 +659,28 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 
 	if ext == ".cmd" || ext == ".bat" {
 		appPath = os.Getenv("SystemRoot") + "\\System32\\cmd.exe"
-		cmdLineStr = fmt.Sprintf("%s /c \"%s\"", appPath, fullCommandPath)
+		// 构建完整命令行，包含参数
+		if len(cmdArgs) > 0 {
+			cmdLineStr = fmt.Sprintf("%s /c \"%s\" %s", appPath, fullCommandPath, strings.Join(cmdArgs, " "))
+		} else {
+			cmdLineStr = fmt.Sprintf("%s /c \"%s\"", appPath, fullCommandPath)
+		}
 	} else if ext == ".ps1" {
 		appPath = os.Getenv("SystemRoot") + "\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
-		cmdLineStr = fmt.Sprintf("%s -ExecutionPolicy Bypass -File \"%s\"", appPath, fullCommandPath)
+		// 构建完整命令行，包含参数
+		if len(cmdArgs) > 0 {
+			cmdLineStr = fmt.Sprintf("%s -ExecutionPolicy Bypass -File \"%s\" %s", appPath, fullCommandPath, strings.Join(cmdArgs, " "))
+		} else {
+			cmdLineStr = fmt.Sprintf("%s -ExecutionPolicy Bypass -File \"%s\"", appPath, fullCommandPath)
+		}
 	} else {
 		appPath = fullCommandPath
-		cmdLineStr = fullCommandPath
+		// 构建完整命令行，包含参数
+		if len(cmdArgs) > 0 {
+			cmdLineStr = fmt.Sprintf("%s %s", fullCommandPath, strings.Join(cmdArgs, " "))
+		} else {
+			cmdLineStr = fullCommandPath
+		}
 	}
 
 	// 转换应用程序路径和命令行为UTF-16

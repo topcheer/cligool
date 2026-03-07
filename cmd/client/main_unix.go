@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -41,7 +42,23 @@ func main() {
 	cols := flag.Int("cols", 0, "终端列数（0=自动检测）")
 	rows := flag.Int("rows", 0, "终端行数（0=自动检测）")
 	execCmd := flag.String("cmd", "", "直接执行的命令（如 claude, gemini 等）")
+	execArgs := flag.String("args", "", "传递给命令的参数（可选，用空格分隔）")
 	flag.Parse()
+
+	// 构建完整的命令行
+	var commandPath string
+	var cmdArgs []string
+	if *execCmd != "" {
+		commandPath = *execCmd
+		// 解析参数
+		if *execArgs != "" {
+			cmdArgs = strings.Fields(*execArgs)
+		}
+	} else {
+		// 使用默认shell
+		commandPath = ""
+		cmdArgs = nil
+	}
 
 	// 自动检测终端大小
 	if *cols == 0 || *rows == 0 {
@@ -71,7 +88,7 @@ func main() {
 	printHeader(sid, *serverURL)
 
 	// 启动WebSocket并运行PTY
-	if err := runTerminalSession(*serverURL, sid, *cols, *rows, *execCmd); err != nil {
+	if err := runTerminalSession(*serverURL, sid, *cols, *rows, commandPath, cmdArgs); err != nil {
 		log.Fatalf("终端会话失败: %v", err)
 	}
 }
@@ -87,7 +104,7 @@ func printHeader(sessionID, serverURL string) {
 	fmt.Println()
 }
 
-func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd string) error {
+func runTerminalSession(serverURL, sessionID string, cols, rows int, commandPath string, cmdArgs []string) error {
 	// 建立 WebSocket 连接
 	wsURL, _ := buildWebSocketURL(serverURL, sessionID)
 	dialer := websocket.DefaultDialer
@@ -145,18 +162,30 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 
 	// 创建 PTY
 	var command *exec.Cmd
-	if execCmd != "" {
+	if commandPath != "" {
 		// 直接执行指定的命令
-		log.Printf("直接执行命令: %s", execCmd)
-		command = exec.Command(execCmd)
-
-		// 确保命令在PATH中能找到
-		if filepath.Base(execCmd) == execCmd {
-			// 如果只给了命令名，没有路径，查找完整路径
-			path, err := exec.LookPath(execCmd)
-			if err == nil {
-				command = exec.Command(path)
+		log.Printf("直接执行命令: %s", commandPath)
+		if len(cmdArgs) > 0 {
+			log.Printf("命令参数: %v", cmdArgs)
+			// 确保命令在PATH中能找到
+			fullPath := commandPath
+			if filepath.Base(commandPath) == commandPath {
+				// 如果只给了命令名，没有路径，查找完整路径
+				if path, err := exec.LookPath(commandPath); err == nil {
+					fullPath = path
+				}
 			}
+			command = exec.Command(fullPath, cmdArgs...)
+		} else {
+			// 确保命令在PATH中能找到
+			fullPath := commandPath
+			if filepath.Base(commandPath) == commandPath {
+				// 如果只给了命令名，没有路径，查找完整路径
+				if path, err := exec.LookPath(commandPath); err == nil {
+					fullPath = path
+				}
+			}
+			command = exec.Command(fullPath)
 		}
 	} else {
 		// 使用默认 shell
