@@ -22,14 +22,13 @@
                                             │
                                             ▼
                                     ┌──────────────┐
-                                    │ PostgreSQL   │
-                                    │    Redis     │
+                                    │ 内存会话管理  │
+                                    │ (无状态)     │
                                     └──────────────┘
 ```
 
 ### 技术栈
 - **后端**: Go 1.21 + Gin + WebSocket
-- **数据库**: PostgreSQL 15 + Redis 7
 - **前端**: 原生JavaScript + xterm.js
 - **部署**: Docker + Docker Compose
 - **网络**: Cloudflare Tunnel (零配置HTTPS)
@@ -38,7 +37,7 @@
 1. **中继服务器** - WebSocket连接管理和消息路由
 2. **CLI客户端** - 本地终端包装器和PTY管理
 3. **Web界面** - 终端模拟器和用户界面
-4. **数据库层** - 会话管理和用户数据
+4. **会话管理** - 内存中维护会话状态，自动清理
 
 ## 🚀 快速开始
 
@@ -84,22 +83,20 @@ cligool/
 │   └── client/            # CLI客户端
 ├── internal/              # 内部包
 │   ├── relay/            # 中继服务逻辑
-│   ├── client/           # 客户端逻辑
-│   ├── terminal/         # 终端处理
-│   └── database/         # 数据库操作
+│   └── client/           # 客户端逻辑
 ├── web/                   # Web界面
-│   └── index.html        # 单页面应用
-├── deployments/           # 部署配置
-│   └── nginx.conf        # 反向代理配置
+│   ├── landing.html      # 下载页面
+│   └── terminal.html     # 终端界面
 ├── scripts/              # 自动化脚本
-│   ├── setup.sh         # 快速设置
-│   └── build.sh         # 构建脚本
+│   ├── build-all.sh     # 构建脚本
+│   └── validate-build.sh # 验证脚本
 ├── docs/                 # 文档
 │   ├── CONFIG.md        # 配置指南
-│   ├── USAGE.md         # 使用指南
+│   ├── CLOUD_DEPLOYMENT_GUIDE.md # 云部署指南
 │   └── DEVELOPMENT.md   # 开发指南
 ├── Makefile             # 构建命令
-├── docker-compose.yml   # Docker配置
+├── docker-compose.yml   # 生产环境配置
+├── docker-compose.dev.yml # 开发环境配置
 └── README.md            # 项目说明
 ```
 
@@ -134,13 +131,8 @@ cligool/
 ### 环境变量
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| `DATABASE_URL` | PostgreSQL连接字符串 | - |
-| `REDIS_URL` | Redis连接字符串 | - |
 | `RELAY_HOST` | 服务监听地址 | 0.0.0.0 |
 | `RELAY_PORT` | 服务监听端口 | 8080 |
-| `ENABLE_AUTO_HTTPS` | 启用自动HTTPS | true |
-| `DOMAIN` | 服务域名 | localhost |
-| `JWT_SECRET` | JWT密钥 | - |
 
 ### 客户端参数
 | 参数 | 说明 | 必填 |
@@ -165,10 +157,10 @@ cligool/
 - 内存使用优化
 
 ### 扩展性
-- 水平扩展支持
+- 无状态设计，易于水平扩展
 - 负载均衡兼容
-- 分布式会话管理
-- Redis集群支持
+- 自动会话清理
+- 轻量级部署
 
 ## 🛡️ 安全设计
 
@@ -180,9 +172,9 @@ cligool/
 
 ### 访问控制
 - 会话ID验证
-- 用户身份认证
-- 角色权限系统
-- 访问日志记录
+- 自动会话过期（90秒无活动）
+- WebSocket心跳检测
+- 连接状态监控
 
 ### 系统安全
 - PTY进程隔离
