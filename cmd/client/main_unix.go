@@ -510,10 +510,8 @@ func createHTTPProxyDialer(proxyURL string) (func(network, addr string) (net.Con
 
 	// 简化：使用 SOCKS5 方式
 	// 大多数 HTTP 代理也支持 SOCKS5 协议
+	// proxyParsed.Host 已经包含主机和端口（如果有）
 	proxyAddr := proxyParsed.Host
-	if proxyParsed.Port() != "" {
-		proxyAddr = net.JoinHostPort(proxyParsed.Host, proxyParsed.Port())
-	}
 
 	dialer, err := proxy.SOCKS5("tcp", proxyAddr, nil, proxy.Direct)
 	if err != nil {
