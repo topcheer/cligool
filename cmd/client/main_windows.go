@@ -3,7 +3,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
@@ -14,12 +13,17 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 	"unicode/utf8"
+	"unsafe"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"golang.org/x/sys/windows"
+	"golang.org/x/term"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/encoding/japanese"
@@ -44,6 +48,388 @@ type TerminalMessage struct {
 // 全局编码转换器
 var consoleEncoding encoding.Encoding
 
+// Windows ConPTY 常量
+const (
+	PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE = 0x00020016
+	S_OK                                = 0
+
+	// 控制台输入模式常量
+	ENABLE_PROCESSED_INPUT        = 0x0001
+	ENABLE_LINE_INPUT             = 0x0002
+	ENABLE_ECHO_INPUT             = 0x0004
+	ENABLE_WINDOW_INPUT           = 0x0008
+	ENABLE_MOUSE_INPUT            = 0x0010
+	ENABLE_INSERT_MODE            = 0x0020
+	ENABLE_QUICK_EDIT_MODE        = 0x0040
+	ENABLE_EXTENDED_FLAGS         = 0x0080
+	ENABLE_VIRTUAL_TERMINAL_INPUT = 0x0200
+
+	// 输入记录类型
+	KEY_EVENT                 = 0x0001
+	MOUSE_EVENT               = 0x0002
+	WINDOW_BUFFER_SIZE_EVENT  = 0x0004
+	MENU_EVENT                = 0x0008
+	FOCUS_EVENT               = 0x0010
+
+	// 标准句柄常量
+	STD_INPUT_HANDLE  = uintptr(0xFFFFFFF6) - 10
+	STD_OUTPUT_HANDLE = uintptr(0xFFFFFFF6) - 11
+)
+
+// Windows API 函数
+var (
+	modkernel32                 = windows.NewLazySystemDLL("kernel32.dll")
+	procCreatePseudoConsole     = modkernel32.NewProc("CreatePseudoConsole")
+	procResizePseudoConsole     = modkernel32.NewProc("ResizePseudoConsole")
+	procClosePseudoConsole      = modkernel32.NewProc("ClosePseudoConsole")
+	procInitializeProcThreadAttributeList = modkernel32.NewProc("InitializeProcThreadAttributeList")
+	procUpdateProcThreadAttribute          = modkernel32.NewProc("UpdateProcThreadAttribute")
+	procDeleteProcThreadAttributeList     = modkernel32.NewProc("DeleteProcThreadAttributeList")
+	procGetStdHandle            = modkernel32.NewProc("GetStdHandle")
+	procGetConsoleMode          = modkernel32.NewProc("GetConsoleMode")
+	procSetConsoleMode          = modkernel32.NewProc("SetConsoleMode")
+	procReadConsoleInput        = modkernel32.NewProc("ReadConsoleInputW")
+	procGetConsoleScreenBufferInfo = modkernel32.NewProc("GetConsoleScreenBufferInfo")
+)
+
+// _CONSOLE_SCREEN_BUFFER_INFO Windows控制台屏幕缓冲区信息
+type _CONSOLE_SCREEN_BUFFER_INFO struct {
+	dwSize              _COORD
+	dwCursorPosition    _COORD
+	wAttributes         uint16
+	srWindow            windows.SmallRect
+	dwMaximumWindowSize _COORD
+}
+
+// _INPUT_RECORD Windows输入记录
+type _INPUT_RECORD struct {
+	EventType uint16
+	Event     [16]byte
+}
+
+// _KEY_EVENT_RECORD Windows键盘事件记录
+type _KEY_EVENT_RECORD struct {
+	bKeyDown          int32
+	wRepeatCount      uint16
+	wVirtualKeyCode   uint16
+	wVirtualScanCode  uint16
+	UnicodeChar       uint16
+	dwControlKeyState uint32
+}
+
+// _COORD Windows坐标结构
+type _COORD struct {
+	X, Y int16
+}
+
+// Pack 将COORD打包成单个uintptr（高16位是Y，低16位是X）
+func (c *_COORD) Pack() uintptr {
+	return uintptr((int32(c.Y) << 16) | int32(c.X))
+}
+
+// _HPCON 伪控制台句柄
+type _HPCON windows.Handle
+
+// pseudoConsole Windows伪终端
+type pseudoConsole struct {
+	handle     _HPCON
+	cmdIn      windows.Handle
+	cmdOut     windows.Handle
+	ptyIn      windows.Handle
+	ptyOut     windows.Handle
+}
+
+// newPseudoConsole 创建一个新的伪控制台
+func newPseudoConsole(width, height int16) (*pseudoConsole, error) {
+	pc := &pseudoConsole{}
+
+	// 创建输入管道 (ptyIn -> cmdIn)
+	if err := windows.CreatePipe(&pc.ptyIn, &pc.cmdIn, nil, 0); err != nil {
+		return nil, fmt.Errorf("创建输入管道失败: %w", err)
+	}
+
+	// 创建输出管道 (cmdOut -> ptyOut)
+	if err := windows.CreatePipe(&pc.cmdOut, &pc.ptyOut, nil, 0); err != nil {
+		windows.CloseHandle(pc.ptyIn)
+		windows.CloseHandle(pc.cmdIn)
+		return nil, fmt.Errorf("创建输出管道失败: %w", err)
+	}
+
+	// 创建COORD并打包
+	coord := &_COORD{
+		X: width,
+		Y: height,
+	}
+
+	// 调用CreatePseudoConsole
+	// 注意：第一个参数是打包后的COORD值，不是指针
+	hr, _, _ := procCreatePseudoConsole.Call(
+		coord.Pack(),    // size (packed COORD)
+		uintptr(pc.ptyIn),  // hInput
+		uintptr(pc.ptyOut), // hOutput
+		0,                // dwFlags
+		uintptr(unsafe.Pointer(&pc.handle)),
+	)
+
+	if hr != S_OK {
+		windows.CloseHandle(pc.ptyIn)
+		windows.CloseHandle(pc.cmdIn)
+		windows.CloseHandle(pc.ptyOut)
+		windows.CloseHandle(pc.cmdOut)
+		return nil, fmt.Errorf("CreatePseudoConsole失败: HRESULT=0x%X", hr)
+	}
+
+	// 关闭不需要的管道端
+	windows.CloseHandle(pc.ptyIn)
+	windows.CloseHandle(pc.ptyOut)
+	pc.ptyIn = 0
+	pc.ptyOut = 0
+
+	return pc, nil
+}
+
+// close 关闭伪控制台
+func (pc *pseudoConsole) close() error {
+	if pc.handle != 0 {
+		procClosePseudoConsole.Call(uintptr(pc.handle))
+		pc.handle = 0
+	}
+	if pc.cmdIn != 0 {
+		windows.CloseHandle(pc.cmdIn)
+		pc.cmdIn = 0
+	}
+	if pc.cmdOut != 0 {
+		windows.CloseHandle(pc.cmdOut)
+		pc.cmdOut = 0
+	}
+	return nil
+}
+
+// setConsoleRawMode 设置控制台为原始模式
+func setConsoleRawMode() (windows.Handle, uint32, error) {
+	// 获取标准输入句柄
+	ret, _, err := procGetStdHandle.Call(STD_INPUT_HANDLE)
+	if ret == 0 {
+		return 0, 0, fmt.Errorf("获取标准输入句柄失败: %v", err)
+	}
+	stdinHandle := windows.Handle(ret)
+
+	// 获取当前控制台模式
+	var originalMode uint32
+	ret1, _, err := procGetConsoleMode.Call(uintptr(stdinHandle), uintptr(unsafe.Pointer(&originalMode)))
+	if ret1 == 0 {
+		return 0, 0, fmt.Errorf("获取控制台模式失败: %v", err)
+	}
+
+	// 只禁用行输入和回显，保留其他所有标志
+	// 这样可以让方向键等特殊按键正常工作
+	rawMode := originalMode &^ (ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT)
+
+	ret2, _, err := procSetConsoleMode.Call(uintptr(stdinHandle), uintptr(rawMode))
+	if ret2 == 0 {
+		return 0, 0, fmt.Errorf("设置控制台原始模式失败: %v", err)
+	}
+
+	return stdinHandle, originalMode, nil
+}
+
+// restoreConsoleMode 恢复控制台模式
+func restoreConsoleMode(stdinHandle windows.Handle, mode uint32) error {
+	ret, _, err := procSetConsoleMode.Call(uintptr(stdinHandle), uintptr(mode))
+	if ret == 0 {
+		return fmt.Errorf("恢复控制台模式失败: %v", err)
+	}
+	return nil
+}
+
+// readConsoleInput 读取控制台输入（包括方向键等特殊按键）
+func readConsoleInput(stdinHandle windows.Handle) ([]byte, error) {
+	var record _INPUT_RECORD
+	var count uint32
+
+	ret, _, err := procReadConsoleInput.Call(
+		uintptr(stdinHandle),
+		uintptr(unsafe.Pointer(&record)),
+		uintptr(1),
+		uintptr(unsafe.Pointer(&count)),
+	)
+	if ret == 0 {
+		return nil, fmt.Errorf("ReadConsoleInput 失败: %v", err)
+	}
+	if count == 0 {
+		return nil, nil
+	}
+
+	// 处理键盘事件
+	if record.EventType == KEY_EVENT {
+		// 解析键盘事件
+		keyEvent := (*_KEY_EVENT_RECORD)(unsafe.Pointer(&record.Event[0]))
+
+		// 只处理按键按下事件
+		if keyEvent.bKeyDown == 0 {
+			return nil, nil
+		}
+
+		// 将 Unicode 字符转换为字节
+		if keyEvent.UnicodeChar != 0 {
+			// 普通字符输入
+			buf := make([]byte, 4)
+			n := utf8.EncodeRune(buf, rune(keyEvent.UnicodeChar))
+			return buf[:n], nil
+		} else {
+			// 特殊按键（方向键、功能键等），转换为 ANSI 转义序列
+			var seq string
+			switch keyEvent.wVirtualKeyCode {
+			case 0x26: // VK_UP
+				seq = "\x1b[A"
+			case 0x28: // VK_DOWN
+				seq = "\x1b[B"
+			case 0x25: // VK_LEFT
+				seq = "\x1b[D"
+			case 0x27: // VK_RIGHT
+				seq = "\x1b[C"
+			case 0x0D: // VK_RETURN
+				seq = "\r"
+			case 0x08: // VK_BACK
+				seq = "\x7f"
+			case 0x09: // VK_TAB
+				seq = "\t"
+			case 0x1B: // VK_ESCAPE
+				seq = "\x1b"
+			case 0x2E: // VK_DELETE
+				seq = "\x1b[3~"
+			case 0x24: // VK_HOME
+				seq = "\x1bOH"
+			case 0x23: // VK_END
+				seq = "\x1bOF"
+			case 0x21: // VK_PRIOR (Page Up)
+				seq = "\x1b[5~"
+			case 0x22: // VK_NEXT (Page Down)
+				seq = "\x1b[6~"
+			default:
+				// 其他按键不处理
+				return nil, nil
+			}
+			return []byte(seq), nil
+		}
+	}
+
+	return nil, nil
+}
+
+// getConsoleSize 获取当前控制台大小
+func getConsoleSize() (cols, rows int16, err error) {
+	// 尝试方法1: 使用 golang.org/x/term 的跨平台方法
+	if width, height, e := term.GetSize(int(os.Stdout.Fd())); e == nil {
+		return int16(width), int16(height), nil
+	}
+
+	// 尝试方法2: 使用 Windows API
+	// 获取标准输出句柄
+	ret, _, _ := procGetStdHandle.Call(STD_OUTPUT_HANDLE)
+	if ret == 0 {
+		return 0, 0, fmt.Errorf("获取标准输出句柄失败")
+	}
+	stdoutHandle := windows.Handle(ret)
+
+	// 获取控制台屏幕缓冲区信息
+	var info _CONSOLE_SCREEN_BUFFER_INFO
+	ret1, _, _ := procGetConsoleScreenBufferInfo.Call(
+		uintptr(stdoutHandle),
+		uintptr(unsafe.Pointer(&info)),
+	)
+	if ret1 == 0 {
+		return 0, 0, fmt.Errorf("获取控制台屏幕缓冲区信息失败")
+	}
+
+	// 窗口大小
+	cols = int16(info.srWindow.Right - info.srWindow.Left + 1)
+	rows = int16(info.srWindow.Bottom - info.srWindow.Top + 1)
+
+	// 确保返回的值是合理的
+	if cols <= 0 || rows <= 0 {
+		return 0, 0, fmt.Errorf("检测到无效的终端大小: %dx%d", cols, rows)
+	}
+
+	return cols, rows, nil
+}
+
+// write 向伪控制台写入数据
+func (pc *pseudoConsole) write(data []byte) (int, error) {
+	if pc.cmdIn == 0 {
+		return 0, fmt.Errorf("输入管道未打开")
+	}
+
+	var written uint32
+	err := windows.WriteFile(pc.cmdIn, data, &written, nil)
+	return int(written), err
+}
+
+// read 从伪控制台读取数据
+func (pc *pseudoConsole) read(buf []byte) (int, error) {
+	if pc.cmdOut == 0 {
+		return 0, fmt.Errorf("输出管道未打开")
+	}
+
+	var read uint32
+	err := windows.ReadFile(pc.cmdOut, buf, &read, nil)
+	return int(read), err
+}
+
+// resize 调整伪控制台大小
+func (pc *pseudoConsole) resize(cols, rows int16) error {
+	if pc.handle == 0 {
+		return fmt.Errorf("伪控制台未初始化")
+	}
+
+	// 创建COORD并打包
+	coord := &_COORD{
+		X: cols,
+		Y: rows,
+	}
+
+	// 调用ResizePseudoConsole
+	hr, _, _ := procResizePseudoConsole.Call(
+		uintptr(pc.handle),
+		coord.Pack(),
+	)
+
+	if hr != S_OK {
+		return fmt.Errorf("ResizePseudoConsole失败: HRESULT=0x%X", hr)
+	}
+
+	return nil
+}
+
+// monitorWindowSize 监控窗口大小变化
+func monitorWindowSize(pc *pseudoConsole, stopChan chan struct{}) {
+	// 保存上一次的大小
+	var lastCols, lastRows int16 = -1, -1
+
+	for {
+		select {
+		case <-stopChan:
+			return
+		default:
+			// 定时检查控制台大小（每500ms）
+			time.Sleep(500 * time.Millisecond)
+
+			// 检查当前控制台大小
+			cols, rows, err := getConsoleSize()
+			if err != nil {
+				continue
+			}
+
+			// 如果大小变化，调整 ConPTY
+			if cols != lastCols || rows != lastRows {
+				pc.resize(cols, rows)
+				lastCols = cols
+				lastRows = rows
+			}
+		}
+	}
+}
+
 func main() {
 	// 初始化控制台编码
 	consoleEncoding = getConsoleEncoding()
@@ -52,10 +438,28 @@ func main() {
 
 	serverURL := flag.String("server", "https://cligool.zty8.cn", "中继服务器URL")
 	sessionID := flag.String("session", "", "会话ID")
-	cols := flag.Int("cols", 120, "终端列数")
-	rows := flag.Int("rows", 80, "终端行数")
+	cols := flag.Int("cols", 0, "终端列数（0=自动检测）")
+	rows := flag.Int("rows", 0, "终端行数（0=自动检测）")
 	execCmd := flag.String("cmd", "", "直接执行的命令（如 claude, gemini 等）")
 	flag.Parse()
+
+	// 自动检测控制台大小
+	actualCols, actualRows, err := getConsoleSize()
+	if err != nil {
+		if *cols == 0 {
+			*cols = 120
+		}
+		if *rows == 0 {
+			*rows = 80
+		}
+	} else {
+		if *cols == 0 {
+			*cols = int(actualCols)
+		}
+		if *rows == 0 {
+			*rows = int(actualRows)
+		}
+	}
 
 	sid := *sessionID
 	if sid == "" {
@@ -107,7 +511,7 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 	log.Println("WebSocket已连接")
 	fmt.Println("已连接到中继服务器")
 	fmt.Println("现在可以在Web终端中输入命令了")
-	fmt.Println("Windows模式：功能可能受限")
+	fmt.Println("Windows模式：使用ConPTY，支持完整终端特性")
 	fmt.Println()
 
 	// 发送系统通知并自动打开浏览器
@@ -169,60 +573,144 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 	wsWriteChan <- jsonData
 	log.Printf("已发送初始化消息: 工作目录=%s, 大小=%dx%d", wd, cols, rows)
 
-	// Windows上使用cmd.exe或者用户指定的命令
-	var cmd *exec.Cmd
+	// 确定要启动的命令
+	var commandPath string
 	if execCmd != "" {
-		// 直接启动指定的命令
 		log.Printf("准备启动命令: %s", execCmd)
-		cmd = exec.Command(execCmd)
+		commandPath = execCmd
 	} else {
-		// 默认使用 cmd.exe
 		log.Println("准备启动cmd.exe...")
-		cmd = exec.Command("cmd.exe")
+		commandPath = "cmd.exe"
 	}
 
-	// 设置环境变量以确保终端工具正确工作
-	cmd.Env = append(os.Environ(),
-		"TERM=xterm-256color",
-		"COLORTERM=truecolor",  // 启用真色支持
-		"FORCE_COLOR=1",         // 强制启用颜色
+	// 创建ConPTY
+	log.Println("创建ConPTY...")
+	pc, err := newPseudoConsole(int16(cols), int16(rows))
+	if err != nil {
+		return fmt.Errorf("创建ConPTY失败: %w", err)
+	}
+	defer pc.close()
+
+	// 初始化ProcThreadAttributeList
+	var size uintptr
+	_, _, _ = procInitializeProcThreadAttributeList.Call(
+		0,
+		1,
+		0,
+		uintptr(unsafe.Pointer(&size)),
 	)
 
-	// Windows 上不需要 LANG/LC_ALL，但确保使用 UTF-8 代码页
-	cmd.Env = append(cmd.Env, "PYTHONIOENCODING=utf-8")  // Python 工具使用 UTF-8
+	// 分配属性列表内存
+	attrListData := make([]byte, size)
 
-	log.Println("创建输入管道...")
-	// 创建输入输出管道
-	stdin, err := cmd.StdinPipe()
+	hr, _, _ := procInitializeProcThreadAttributeList.Call(
+		uintptr(unsafe.Pointer(&attrListData[0])),
+		1,
+		0,
+		uintptr(unsafe.Pointer(&size)),
+	)
+
+	if hr != 1 { // 返回值是BOOL，1表示成功
+		return fmt.Errorf("初始化属性列表失败")
+	}
+	defer procDeleteProcThreadAttributeList.Call(uintptr(unsafe.Pointer(&attrListData[0])))
+
+	// 更新属性列表以包含PseudoConsole
+	hr, _, _ = procUpdateProcThreadAttribute.Call(
+		uintptr(unsafe.Pointer(&attrListData[0])),
+		0,
+		PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
+		uintptr(pc.handle),
+		unsafe.Sizeof(pc.handle),
+		0,
+		0,
+	)
+
+	if hr != 1 {
+		return fmt.Errorf("更新PseudoConsole属性失败")
+	}
+
+	// 创建StartupInfoEx
+	si := &windows.StartupInfoEx{
+		StartupInfo: windows.StartupInfo{
+			Cb: uint32(unsafe.Sizeof(windows.StartupInfoEx{})),
+		},
+	}
+	si.ProcThreadAttributeList = (*windows.ProcThreadAttributeList)(unsafe.Pointer(&attrListData[0]))
+
+	// 查找命令的完整路径
+	fullCommandPath := commandPath
+	if !strings.Contains(commandPath, "\\") && !strings.Contains(commandPath, "/") {
+		// 不包含路径分隔符，尝试在PATH中查找
+		if path, err := exec.LookPath(commandPath); err == nil {
+			fullCommandPath = path
+		}
+	}
+
+	// 检查是否是脚本文件（.cmd, .bat, .ps1等）
+	var appPath, cmdLineStr string
+	ext := strings.ToLower(filepath.Ext(fullCommandPath))
+
+	if ext == ".cmd" || ext == ".bat" {
+		appPath = os.Getenv("SystemRoot") + "\\System32\\cmd.exe"
+		cmdLineStr = fmt.Sprintf("%s /c \"%s\"", appPath, fullCommandPath)
+	} else if ext == ".ps1" {
+		appPath = os.Getenv("SystemRoot") + "\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+		cmdLineStr = fmt.Sprintf("%s -ExecutionPolicy Bypass -File \"%s\"", appPath, fullCommandPath)
+	} else {
+		appPath = fullCommandPath
+		cmdLineStr = fullCommandPath
+	}
+
+	// 转换应用程序路径和命令行为UTF-16
+	appName, err := windows.UTF16PtrFromString(appPath)
 	if err != nil {
-		return fmt.Errorf("创建stdin管道失败: %w", err)
+		return fmt.Errorf("转换应用程序路径失败: %w", err)
 	}
-
-	log.Println("创建输出管道...")
-	stdout, err := cmd.StdoutPipe()
+	cmdLine, err := windows.UTF16PtrFromString(cmdLineStr)
 	if err != nil {
-		return fmt.Errorf("创建stdout管道失败: %w", err)
+		return fmt.Errorf("转换命令行失败: %w", err)
 	}
 
-	stderr, err := cmd.StderrPipe()
+	// 创建进程
+	log.Printf("启动命令: %s", appPath)
+	var pi windows.ProcessInformation
+
+	err = windows.CreateProcess(
+		appName,
+		cmdLine,
+		nil,
+		nil,
+		false, // 不继承句柄
+		windows.EXTENDED_STARTUPINFO_PRESENT,
+		nil,   // 使用父进程环境
+		nil,   // 使用当前目录
+		&si.StartupInfo,
+		&pi,
+	)
 	if err != nil {
-		return fmt.Errorf("创建stderr管道失败: %w", err)
+		log.Printf("CreateProcess失败: %v", err)
+		return fmt.Errorf("CreateProcess失败: %w", err)
+	}
+	defer windows.CloseHandle(pi.Thread)
+	defer windows.CloseHandle(pi.Process)
+
+	log.Printf("命令已启动: %s, PID: %d", appPath, pi.ProcessId)
+
+	// 启动窗口大小监控
+	stopMonitor := make(chan struct{})
+	go monitorWindowSize(pc, stopMonitor)
+	defer close(stopMonitor)
+
+	// 设置标准输入为原始模式
+	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
+	if err != nil {
+		log.Printf("警告: 无法设置终端为原始模式: %v", err)
+	} else {
+		defer term.Restore(int(os.Stdin.Fd()), oldState)
 	}
 
-	log.Println("启动cmd.exe进程...")
-	// 启动命令
-	if err := cmd.Start(); err != nil {
-		log.Printf("cmd.exe启动失败: %v", err)
-		return fmt.Errorf("启动命令失败: %w", err)
-	}
-	defer cmd.Process.Kill()
-
-	log.Println("cmd.exe已启动，PID:", cmd.Process.Pid)
-
-	// 使用带缓冲的写入器并确保每次写入都flush
-	stdinWriter := bufio.NewWriter(stdin)
-
-	// 本地终端输入 -> Stdin
+	// 本地终端输入 -> ConPTY
 	go func() {
 		buf := make([]byte, 1024)
 		for {
@@ -231,21 +719,18 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 				if err == io.EOF {
 					return
 				}
-				log.Printf("本地stdin读取失败: %v", err)
+				continue
+			}
+
+			if n == 0 {
 				continue
 			}
 
 			data := buf[:n]
 
-			// 写入cmd.exe
-			_, writeErr := stdinWriter.Write(data)
-			if writeErr != nil {
-				log.Printf("写入stdin失败（本地输入）: %v", writeErr)
+			// 写入ConPTY
+			if _, writeErr := pc.write(data); writeErr != nil {
 				continue
-			}
-
-			if err := stdinWriter.Flush(); err != nil {
-				log.Printf("Flush失败（本地输入）: %v", err)
 			}
 
 			// 发送到WebSocket，让Web端看到本地输入
@@ -261,92 +746,37 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 		}
 	}()
 
-	// WebSocket -> Stdin (网页输入写入命令)
+	// WebSocket -> ConPTY (网页输入写入ConPTY)
 	go func() {
 		for {
 			_, message, err := conn.ReadMessage()
 			if err != nil {
-				log.Printf("WebSocket读取失败: %v", err)
 				return
 			}
 
 			var msg TerminalMessage
 			if err := json.Unmarshal(message, &msg); err != nil {
-				log.Printf("JSON解析失败: %v", err)
 				continue
 			}
 
 			if msg.Type == "input" && msg.Data != "" {
-				// Windows cmd.exe需要CRLF换行符
 				data := []byte(msg.Data)
-				// 将单独的"\r"转换为"\r\n" (Windows标准换行符)
-				if msg.Data == "\r" {
-					data = []byte("\r\n")
-				}
-
-				_, err := stdinWriter.Write(data)
-				if err != nil {
-					log.Printf("写入stdin失败: %v", err)
-				} else {
-					// 立即flush确保cmd.exe收到输入
-					if err := stdinWriter.Flush(); err != nil {
-						log.Printf("Flush失败: %v", err)
-					}
-				}
+				pc.write(data)
 			}
 		}
 	}()
 
-	// stderr读取（发送到WebSocket和本地stderr）
-	go func() {
-		// 使用更大的缓冲区
-		buf := make([]byte, 4096)
-		for {
-			n, err := stderr.Read(buf)
-			if err != nil {
-				if err != io.EOF {
-					// log.Printf("stderr读取失败: %v", err)
-				}
-				return
-			}
-
-			data := buf[:n]
-			// 转换控制台编码到UTF-8
-			converted, err := convertToUTF8(data)
-			if err != nil {
-				// 如果转换失败，使用原始数据
-				converted = string(data)
-			}
-
-			// 1. 显示到本地终端stderr（UTF-8数据）
-			os.Stderr.Write([]byte(converted))
-
-			// 2. 发送到WebSocket
-			msg := TerminalMessage{
-				Type:    "output",
-				Data:    converted,
-				Session: sessionID,
-				UserID:  "client",
-			}
-
-			jsonData, _ := json.Marshal(msg)
-			wsWriteChan <- jsonData
-		}
-	}()
-
-	// Stdout -> 本地stdout + WebSocket (命令输出同时显示在两端)
-	// 使用更大的缓冲区以处理cmd.exe的大量输出
+	// ConPTY -> 本地stdout + WebSocket (ConPTY输出同时显示在两端)
 	buf := make([]byte, 4096)
 	for {
-		n, err := stdout.Read(buf)
+		n, err := pc.read(buf)
 		if err != nil {
 			if err == io.EOF {
 				return nil
 			}
-			return fmt.Errorf("stdout读取失败: %w", err)
+			return fmt.Errorf("ConPTY读取失败: %w", err)
 		}
 
-		// Windows cmd.exe使用控制台编码，需要转换为UTF-8
 		data := buf[:n]
 
 		// 转换控制台编码到UTF-8
@@ -410,12 +840,14 @@ func getConsoleEncoding() encoding.Encoding {
 
 // convertToUTF8 将控制台编码的字节转换为UTF-8字符串
 func convertToUTF8(data []byte) (string, error) {
+	// 首先检查数据是否已经是有效的UTF-8（ConPTY默认输出UTF-8）
+	if utf8.Valid(data) {
+		return string(data), nil
+	}
+
+	// 如果不是UTF-8，尝试使用检测到的控制台编码进行转换
 	if consoleEncoding == nil {
-		// 如果无法检测编码，尝试直接作为UTF-8
-		if utf8.Valid(data) {
-			return string(data), nil
-		}
-		// 否则作为Latin-1处理
+		// 如果无法检测编码，作为Latin-1处理
 		decoded, _ := charmap.Windows1252.NewDecoder().Bytes(data)
 		return string(decoded), nil
 	}

@@ -38,10 +38,29 @@ type TerminalMessage struct {
 func main() {
 	serverURL := flag.String("server", "https://cligool.zty8.cn", "中继服务器URL")
 	sessionID := flag.String("session", "", "会话ID")
-	cols := flag.Int("cols", 120, "终端列数")
-	rows := flag.Int("rows", 80, "终端行数")
+	cols := flag.Int("cols", 0, "终端列数（0=自动检测）")
+	rows := flag.Int("rows", 0, "终端行数（0=自动检测）")
 	execCmd := flag.String("cmd", "", "直接执行的命令（如 claude, gemini 等）")
 	flag.Parse()
+
+	// 自动检测终端大小
+	if *cols == 0 || *rows == 0 {
+		if size, err := pty.GetsizeFull(os.Stdout); err == nil {
+			if *cols == 0 {
+				*cols = int(size.Cols)
+			}
+			if *rows == 0 {
+				*rows = int(size.Rows)
+			}
+		} else {
+			if *cols == 0 {
+				*cols = 120
+			}
+			if *rows == 0 {
+				*rows = 80
+			}
+		}
+	}
 
 	sid := *sessionID
 	if sid == "" {
@@ -189,11 +208,30 @@ func runTerminalSession(serverURL, sessionID string, cols, rows int, execCmd str
 
 	// 处理窗口大小变化
 	handleResize := func() {
-		// 获取当前终端窗口大小
-		if size, err := pty.GetsizeFull(ptmx); err == nil {
+		// 从标准输入获取当前终端窗口大小
+		if size, err := pty.GetsizeFull(os.Stdin); err == nil {
+			// 更新 PTY 窗口大小
 			if err := pty.Setsize(ptmx, size); err != nil {
-				log.Printf("更新PTY窗口大小失败: %v", err)
+				// 如果失败，尝试使用完整结构体
+				fullSize := &pty.Winsize{
+					Rows: size.Rows,
+					Cols: size.Cols,
+					X:    size.X,
+					Y:    size.Y,
+				}
+				_ = pty.Setsize(ptmx, fullSize)
 			}
+
+			// 发送新的终端大小到 WebSocket 服务器
+			resizeMsg := TerminalMessage{
+				Type:   "resize",
+				Rows:   int(size.Rows),
+				Cols:   int(size.Cols),
+				Session: sessionID,
+				UserID: "client",
+			}
+			jsonData, _ := json.Marshal(resizeMsg)
+			wsWriteChan <- jsonData
 		}
 	}
 
