@@ -143,6 +143,73 @@ export RELAY_PORT=8080
 ./relay-server
 ```
 
+### Method 4: Cloud Platform One-Click Deployment (Free) ☁️
+
+Don't want to maintain your own server? Deploy to free cloud platforms with one click!
+
+#### Platform Comparison
+
+| Platform | Free Tier | Difficulty | Cold Start | Recommendation |
+|----------|-----------|------------|------------|----------------|
+| **Render** | ✅ Completely Free | ⭐ Easiest | 15-30s | ⭐⭐⭐⭐⭐ |
+| **Koyeb** | $5.5/month | ⭐⭐ Medium | None | ⭐⭐⭐⭐ |
+| **Railway** | $5/month | ⭐⭐ Simple | None | ⭐⭐⭐⭐⭐ |
+| **Fly.io** | Partially Free | ⭐⭐ Medium | None | ⭐⭐⭐⭐ |
+
+#### Render Deployment (Recommended, Completely Free)
+
+```bash
+# 1. Visit Render Blueprint
+open https://dashboard.render.com/blueprints/new
+
+# 2. Connect your GitHub account
+# 3. Select topcheer/cligool repository
+# 4. Click "Apply Blueprint"
+# 5. Wait 3-5 minutes, get deployment URL
+```
+
+**Detailed Guide**: [docs/CLOUD_DEPLOYMENT_GUIDE.md](docs/CLOUD_DEPLOYMENT_GUIDE.md)
+
+#### Railway Deployment
+
+```bash
+# 1. Visit Railway
+open https://railway.app
+
+# 2. Click "Deploy from GitHub"
+# 3. Select topcheer/cligool repository
+# 4. Railway auto-detects railway.toml configuration
+# 5. Deployment complete, get URL
+```
+
+#### Koyeb Deployment
+
+```bash
+# 1. Install Koyeb CLI
+curl -s https://get.koyeb.com | sh
+
+# 2. Login and deploy
+koyeb login
+koyeb init
+
+# Koyeb auto-reads koyeb.yaml and deploys
+```
+
+#### Fly.io Deployment
+
+```bash
+# 1. Install Fly CLI
+curl -L https://fly.io/install.sh | sh
+
+# 2. Login and deploy
+flyctl auth login
+flyctl launch
+
+# Fly auto-reads fly.toml and deploys
+```
+
+**All cloud platform configuration files included in repository, ready to use!**
+
 ## 📥 Client Installation
 
 ### Automatic Installation (macOS/Linux)

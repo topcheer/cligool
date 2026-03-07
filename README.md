@@ -173,6 +173,73 @@ CliGool 支持配置文件来设置常用参数：
 
 在浏览器中打开显示的地址即可使用远程终端。
 
+### 方法三：云平台一键部署（免费）☁️
+
+不想自己维护服务器？可以使用免费云平台一键部署！
+
+#### 平台对比
+
+| 平台 | 免费额度 | 部署难度 | 冷启动 | 推荐指数 |
+|------|---------|---------|--------|---------|
+| **Render** | ✅ 完全免费 | ⭐ 最简单 | 15-30秒 | ⭐⭐⭐⭐⭐ |
+| **Koyeb** | $5.5/月 | ⭐⭐ 中等 | 无 | ⭐⭐⭐⭐ |
+| **Railway** | $5/月 | ⭐⭐ 简单 | 无 | ⭐⭐⭐⭐⭐ |
+| **Fly.io** | 部分免费 | ⭐⭐ 中等 | 无 | ⭐⭐⭐⭐ |
+
+#### Render 部署（推荐，完全免费）
+
+```bash
+# 1. 访问 Render Blueprint
+open https://dashboard.render.com/blueprints/new
+
+# 2. 连接你的 GitHub 账号
+# 3. 选择 topcheer/cligool 仓库
+# 4. 点击 "Apply Blueprint"
+# 5. 等待 3-5 分钟，获得部署 URL
+```
+
+**详细指南**: [docs/CLOUD_DEPLOYMENT_GUIDE.md](docs/CLOUD_DEPLOYMENT_GUIDE.md)
+
+#### Railway 部署
+
+```bash
+# 1. 访问 Railway
+open https://railway.app
+
+# 2. 点击 "Deploy from GitHub"
+# 3. 选择 topcheer/cligool 仓库
+# 4. Railway 自动检测 railway.toml 配置
+# 5. 部署完成，获得 URL
+```
+
+#### Koyeb 部署
+
+```bash
+# 1. 安装 Koyeb CLI
+curl -s https://get.koyeb.com | sh
+
+# 2. 登录并部署
+koyeb login
+koyeb init
+
+# Koyeb 自动读取 koyeb.yaml 配置并部署
+```
+
+#### Fly.io 部署
+
+```bash
+# 1. 安装 Fly CLI
+curl -L https://fly.io/install.sh | sh
+
+# 2. 登录并部署
+flyctl auth login
+flyctl launch
+
+# Fly 自动读取 fly.toml 配置并部署
+```
+
+**所有云平台配置文件已包含在仓库中，开箱即用！**
+
 ## 📂 项目结构
 
 ```
