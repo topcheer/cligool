@@ -447,12 +447,12 @@ func main() {
 	// 构建完整的命令行
 	var commandPath string
 	var cmdArgs []string
-	if execCmd != "" {
-		log.Printf("准备启动命令: %s", execCmd)
-		commandPath = execCmd
+	if *execCmd != "" {
+		log.Printf("准备启动命令: %s", *execCmd)
+		commandPath = *execCmd
 		// 解析参数
-		if execArgs != "" {
-			cmdArgs = strings.Fields(execArgs)
+		if *execArgs != "" {
+			cmdArgs = strings.Fields(*execArgs)
 		}
 	} else {
 		log.Println("准备启动cmd.exe...")
