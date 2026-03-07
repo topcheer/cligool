@@ -1,0 +1,350 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    name: Build All Platforms
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Create output directory
+        run: |
+          mkdir -p bin
+          mkdir -p release
+
+      # ==================== Windows Builds ====================
+      - name: Build Windows amd64
+        run: |
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o bin/cligool-windows-amd64.exe ./cmd/client
+          cd bin
+          zip cligool-windows-amd64.zip cligool-windows-amd64.exe
+          mv cligool-windows-amd64.zip ../release/
+
+      - name: Build Windows arm64
+        run: |
+          CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -o bin/cligool-windows-arm64.exe ./cmd/client
+          cd bin
+          zip cligool-windows-arm64.zip cligool-windows-arm64.exe
+          mv cligool-windows-arm64.zip ../release/
+
+      # ==================== macOS Builds ====================
+      - name: Build macOS amd64
+        run: |
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o bin/cligool-darwin-amd64 ./cmd/client
+
+      - name: Build macOS arm64
+        run: |
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o bin/cligool-darwin-arm64 ./cmd/client
+
+      # ==================== Linux Builds ====================
+      - name: Build Linux amd64
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/cligool-linux-amd64 ./cmd/client
+
+      - name: Build Linux arm64
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o bin/cligool-linux-arm64 ./cmd/client
+
+      - name: Build Linux 386
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=386 go build -o bin/cligool-linux-386 ./cmd/client
+
+      - name: Build Linux arm
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm go build -o bin/cligool-linux-arm ./cmd/client
+
+      - name: Build Linux ppc64le
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=ppc64le go build -o bin/cligool-linux-ppc64le ./cmd/client
+
+      - name: Build Linux riscv64
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=riscv64 go build -o bin/cligool-linux-riscv64 ./cmd/client
+
+      - name: Build Linux s390x
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=s390x go build -o bin/cligool-linux-s390x ./cmd/client
+
+      - name: Build Linux mips64le
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=mips64le go build -o bin/cligool-linux-mips64le ./cmd/client
+
+      # ==================== *BSD Builds ====================
+      - name: Build FreeBSD amd64
+        run: |
+          CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 go build -o bin/cligool-freebsd-amd64 ./cmd/client
+
+      - name: Build FreeBSD arm64
+        run: |
+          CGO_ENABLED=0 GOOS=freebsd GOARCH=arm64 go build -o bin/cligool-freebsd-arm64 ./cmd/client
+
+      - name: Build OpenBSD amd64
+        run: |
+          CGO_ENABLED=0 GOOS=openbsd GOARCH=amd64 go build -o bin/cligool-openbsd-amd64 ./cmd/client
+
+      - name: Build OpenBSD arm64
+        run: |
+          CGO_ENABLED=0 GOOS=openbsd GOARCH=arm64 go build -o bin/cligool-openbsd-arm64 ./cmd/client
+
+      - name: Build NetBSD amd64
+        run: |
+          CGO_ENABLED=0 GOOS=netbsd GOARCH=amd64 go build -o bin/cligool-netbsd-amd64 ./cmd/client
+
+      - name: Build DragonFlyBSD amd64
+        run: |
+          CGO_ENABLED=0 GOOS=dragonfly GOARCH=amd64 go build -o bin/cligool-dragonfly-amd64 ./cmd/client
+
+      # ==================== Build Relay Server ====================
+      - name: Build Relay Server
+        run: |
+          CGO_ENABLED=0 GOOS=linux go build -o bin/relay-server ./cmd/relay
+
+      # ==================== Create Release Artifacts ====================
+      - name: Create Release Archives
+        run: |
+          cd bin
+
+          # Create archives for download
+          tar -czf cligool-darwin-amd64.tar.gz cligool-darwin-amd64
+          tar -czf cligool-darwin-arm64.tar.gz cligool-darwin-arm64
+
+          tar -czf cligool-linux-amd64.tar.gz cligool-linux-amd64
+          tar -czf cligool-linux-arm64.tar.gz cligool-linux-arm64
+          tar -czf cligool-linux-386.tar.gz cligool-linux-386
+          tar -czf cligool-linux-arm.tar.gz cligool-linux-arm
+          tar -czf cligool-linux-ppc64le.tar.gz cligool-linux-ppc64le
+          tar -czf cligool-linux-riscv64.tar.gz cligool-linux-riscv64
+          tar -czf cligool-linux-s390x.tar.gz cligool-linux-s390x
+          tar -czf cligool-linux-mips64le.tar.gz cligool-linux-mips64le
+
+          tar -czf cligool-freebsd-amd64.tar.gz cligool-freebsd-amd64
+          tar -czf cligool-freebsd-arm64.tar.gz cligool-freebsd-arm64
+          tar -czf cligool-openbsd-amd64.tar.gz cligool-openbsd-amd64
+          tar -czf cligool-openbsd-arm64.tar.gz cligool-openbsd-arm64
+          tar -czf cligool-netbsd-amd64.tar.gz cligool-netbsd-amd64
+          tar -czf cligool-dragonfly-amd64.tar.gz cligool-dragonfly-amd64
+
+          # Move all archives to release directory
+          mv *.tar.gz ../release/
+
+      - name: List all release files
+        run: |
+          echo "All release files:"
+          ls -lh release/
+
+      # ==================== Upload to Release ====================
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: CliGool ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+      # Upload Windows binaries
+      - name: Upload Windows amd64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release/cligool-windows-amd64.zip
+          asset_name: cligool-windows-amd64.zip
+          asset_content_type: application/zip
+
+      - name: Upload Windows arm64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release/cligool-windows-arm64.zip
+          asset_name: cligool-windows-arm64.zip
+          asset_content_type: application/zip
+
+      # Upload macOS binaries
+      - name: Upload macOS amd64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release/cligool-darwin-amd64.tar.gz
+          asset_name: cligool-darwin-amd64.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload macOS arm64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release/cligool-darwin-arm64.tar.gz
+          asset_name: cligool-darwin-arm64.tar.gz
+          asset_content_type: application/gzip
+
+      # Upload Linux binaries
+      - name: Upload Linux amd64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release/cligool-linux-amd64.tar.gz
+          asset_name: cligool-linux-amd64.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload Linux arm64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release/cligool-linux-arm64.tar.gz
+          asset_name: cligool-linux-arm64.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload Linux 386
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release/cligool-linux-386.tar.gz
+          asset_name: cligool-linux-386.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload Linux arm
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release/cligool-linux-arm.tar.gz
+          asset_name: cligool-linux-arm.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload Linux ppc64le
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release/cligool-linux-ppc64le.tar.gz
+          asset_name: cligool-linux-ppc64le.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload Linux riscv64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release/cligool-linux-riscv64.tar.gz
+          asset_name: cligool-linux-riscv64.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload Linux s390x
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release/cligool-linux-s390x.tar.gz
+          asset_name: cligool-linux-s390x.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload Linux mips64le
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release/cligool-linux-mips64le.tar.gz
+          asset_name: cligool-linux-mips64le.tar.gz
+          asset_content_type: application/gzip
+
+      # Upload *BSD binaries
+      - name: Upload FreeBSD amd64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release/cligool-freebsd-amd64.tar.gz
+          asset_name: cligool-freebsd-amd64.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload FreeBSD arm64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release/cligool-freebsd-arm64.tar.gz
+          asset_name: cligool-freebsd-arm64.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload OpenBSD amd64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release/cligool-openbsd-amd64.tar.gz
+          asset_name: cligool-openbsd-amd64.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload OpenBSD arm64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release/cligool-openbsd-arm64.tar.gz
+          asset_name: cligool-openbsd-arm64.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload NetBSD amd64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release/cligool-netbsd-amd64.tar.gz
+          asset_name: cligool-netbsd-amd64.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload DragonFlyBSD amd64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release/cligool-dragonfly-amd64.tar.gz
+          asset_name: cligool-dragonfly-amd64.tar.gz
+          asset_content_type: application/gzip
