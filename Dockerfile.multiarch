@@ -118,21 +118,12 @@ RUN CGO_ENABLED=0 GOOS=freebsd GOARCH=arm GOARM=6 go build -o web/downloads/clig
 RUN CGO_ENABLED=0 GOOS=freebsd GOARCH=riscv64 go build -o web/downloads/cligool-freebsd-riscv64 ./cmd/client && \
     cd web/downloads && tar -czf cligool-freebsd-riscv64.tar.gz cligool-freebsd-riscv64 && rm -f cligool-freebsd-riscv64 && cd /app
 
-# OpenBSD版本
+# OpenBSD版本（仅支持 amd64 和 arm64）
 RUN CGO_ENABLED=0 GOOS=openbsd GOARCH=amd64 go build -o web/downloads/cligool-openbsd-amd64 ./cmd/client && \
     cd web/downloads && tar -czf cligool-openbsd-amd64.tar.gz cligool-openbsd-amd64 && rm -f cligool-openbsd-amd64 && cd /app
 
 RUN CGO_ENABLED=0 GOOS=openbsd GOARCH=arm64 go build -o web/downloads/cligool-openbsd-arm64 ./cmd/client && \
     cd web/downloads && tar -czf cligool-openbsd-arm64.tar.gz cligool-openbsd-arm64 && rm -f cligool-openbsd-arm64 && cd /app
-
-RUN CGO_ENABLED=0 GOOS=openbsd GOARCH=386 go build -o web/downloads/cligool-openbsd-386 ./cmd/client && \
-    cd web/downloads && tar -czf cligool-openbsd-386.tar.gz cligool-openbsd-386 && rm -f cligool-openbsd-386 && cd /app
-
-RUN CGO_ENABLED=0 GOOS=openbsd GOARCH=arm GOARM=6 go build -o web/downloads/cligool-openbsd-arm ./cmd/client && \
-    cd web/downloads && tar -czf cligool-openbsd-arm.tar.gz cligool-openbsd-arm && rm -f cligool-openbsd-arm && cd /app
-
-RUN CGO_ENABLED=0 GOOS=openbsd GOARCH=riscv64 go build -o web/downloads/cligool-openbsd-riscv64 ./cmd/client && \
-    cd web/downloads && tar -czf cligool-openbsd-riscv64.tar.gz cligool-openbsd-riscv64 && rm -f cligool-openbsd-riscv64 && cd /app
 
 # NetBSD版本
 RUN CGO_ENABLED=0 GOOS=netbsd GOARCH=amd64 go build -o web/downloads/cligool-netbsd-amd64 ./cmd/client && \
@@ -147,12 +138,9 @@ RUN CGO_ENABLED=0 GOOS=netbsd GOARCH=arm GOARM=6 go build -o web/downloads/cligo
 RUN CGO_ENABLED=0 GOOS=netbsd GOARCH=386 go build -o web/downloads/cligool-netbsd-386 ./cmd/client && \
     cd web/downloads && tar -czf cligool-netbsd-386.tar.gz cligool-netbsd-386 && rm -f cligool-netbsd-386 && cd /app
 
-# DragonFlyBSD版本
+# DragonFlyBSD版本（仅支持 amd64）
 RUN CGO_ENABLED=0 GOOS=dragonfly GOARCH=amd64 go build -o web/downloads/cligool-dragonfly-amd64 ./cmd/client && \
     cd web/downloads && tar -czf cligool-dragonfly-amd64.tar.gz cligool-dragonfly-amd64 && rm -f cligool-dragonfly-amd64 && cd /app
-
-RUN CGO_ENABLED=0 GOOS=dragonfly GOARCH=arm64 go build -o web/downloads/cligool-dragonfly-arm64 ./cmd/client && \
-    cd web/downloads && tar -czf cligool-dragonfly-arm64.tar.gz cligool-dragonfly-arm64 && rm -f cligool-dragonfly-arm64 && cd /app
 
 # 列出所有构建的文件
 RUN echo "All built files:" && ls -lh web/downloads/
