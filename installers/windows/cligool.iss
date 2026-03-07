@@ -41,8 +41,8 @@ VersionInfoDescription=CliGool 远程终端安装程序
 VersionInfoCopyright=Copyright (C) 2024
 
 [Languages]
-Name: "chinesesimp"; MessagesFile: "compiler:Languages\ChineseSimp.isl"
 Name: "english"; MessagesFile: "compiler:Languages\English.isl"
+; Name: "chinesesimp"; MessagesFile: "compiler:Languages\ChineseSimp.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加图标:"
@@ -278,12 +278,12 @@ begin
 end;
 
 [Messages]
-; 中文
-chinesesimp.WelcomeLabel2=本程序将在您的计算机上安装 CliGool 远程终端工具。
-chinesesimp.AdminPermissions=如需安装到系统目录或使用完整功能，请以管理员身份运行本程序。
-chinesesimp.ClickNext=点击"下一步"继续。
-
 ; English
 english.WelcomeLabel2=This program will install CliGool Remote Terminal on your computer.
 english.AdminPermissions=Please run this program as administrator to install to system directories or use full functionality.
 english.ClickNext=Click "Next" to continue.
+
+; 中文 - 需要中文语言包支持，暂时注释
+; chinesesimp.WelcomeLabel2=本程序将在您的计算机上安装 CliGool 远程终端工具。
+; chinesesimp.AdminPermissions=如需安装到系统目录或使用完整功能，请以管理员身份运行本程序。
+; chinesesimp.ClickNext=点击"下一步"继续。
