@@ -2,7 +2,10 @@ version: '3.8'
 
 services:
   relay-server:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.multiarch
+    image: cligool:latest
     container_name: cligool-relay
     ports:
       - "8081:8080"

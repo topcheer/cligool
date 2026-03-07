@@ -1,0 +1,191 @@
+# 多架构构建的中继服务器Dockerfile
+# 支持：linux/amd64, linux/arm64
+
+# ============================================
+# 第一阶段：构建阶段
+# ============================================
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
+
+# 构建参数
+ARG VERSION=dev
+ARG BUILD_TIME
+ARG COMMIT_SHA
+ARG TARGETPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
+
+WORKDIR /app
+
+# 安装构建依赖
+RUN apk add --no-cache \
+    git \
+    make \
+    zip \
+    gcc \
+    musl-dev
+
+# 设置Go环境变量
+ENV CGO_ENABLED=0 \
+    GOOS=${TARGETOS} \
+    GOARCH=${TARGETARCH} \
+    GOPROXY=https://goproxy.cn,direct
+
+# 复制依赖文件
+COPY go.mod go.sum ./
+RUN go mod download
+
+# 复制源代码
+COPY . .
+
+# 构建中继服务器（注入版本信息）
+RUN GOOS=linux GOARCH=${TARGETARCH} CGO_ENABLED=0 go build \
+    -ldflags="-X 'main.Version=${VERSION}' -X 'main.BuildTime=${BUILD_TIME}' -X 'main.CommitSHA=${COMMIT_SHA}'" \
+    -o relay-server \
+    ./cmd/relay
+
+# ============================================
+# 第二阶段：构建所有平台的客户端
+# ============================================
+RUN mkdir -p web/downloads
+
+# Windows版本
+RUN CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o web/downloads/cligool-windows-amd64.exe ./cmd/client && \
+    cd web/downloads && zip cligool-windows-amd64.zip cligool-windows-amd64.exe && rm -f cligool-windows-amd64.exe && cd /app
+
+RUN CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -o web/downloads/cligool-windows-arm64.exe ./cmd/client && \
+    cd web/downloads && zip cligool-windows-arm64.zip cligool-windows-arm64.exe && rm -f cligool-windows-arm64.exe && cd /app
+
+# macOS版本
+RUN CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o web/downloads/cligool-darwin-amd64 ./cmd/client && \
+    cd web/downloads && tar -czf cligool-darwin-amd64.tar.gz cligool-darwin-amd64 && rm -f cligool-darwin-amd64 && cd /app
+
+RUN CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o web/downloads/cligool-darwin-arm64 ./cmd/client && \
+    cd web/downloads && tar -czf cligool-darwin-arm64.tar.gz cligool-darwin-arm64 && rm -f cligool-darwin-arm64 && cd /app
+
+# Linux版本（常用架构）
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o web/downloads/cligool-linux-amd64 ./cmd/client && \
+    cd web/downloads && tar -czf cligool-linux-amd64.tar.gz cligool-linux-amd64 && rm -f cligool-linux-amd64 && cd /app
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o web/downloads/cligool-linux-arm64 ./cmd/client && \
+    cd web/downloads && tar -czf cligool-linux-arm64.tar.gz cligool-linux-arm64 && rm -f cligool-linux-arm64 && cd /app
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=386 go build -o web/downloads/cligool-linux-386 ./cmd/client && \
+    cd web/downloads && tar -czf cligool-linux-386.tar.gz cligool-linux-386 && rm -f cligool-linux-386 && cd /app
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm go build -o web/downloads/cligool-linux-arm ./cmd/client && \
+    cd web/downloads && tar -czf cligool-linux-arm.tar.gz cligool-linux-arm && rm -f cligool-linux-arm && cd /app
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GOARM=7 go build -o web/downloads/cligool-linux-armbe ./cmd/client && \
+    cd web/downloads && tar -czf cligool-linux-armbe.tar.gz cligool-linux-armbe && rm -f cligool-linux-armbe && cd /app
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=ppc64le go build -o web/downloads/cligool-linux-ppc64le ./cmd/client && \
+    cd web/downloads && tar -czf cligool-linux-ppc64le.tar.gz cligool-linux-ppc64le && rm -f cligool-linux-ppc64le && cd /app
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=ppc64 GOBIGENDIAN=true go build -o web/downloads/cligool-linux-ppc64 ./cmd/client && \
+    cd web/downloads && tar -czf cligool-linux-ppc64.tar.gz cligool-linux-ppc64 && rm -f cligool-linux-ppc64 && cd /app
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=riscv64 go build -o web/downloads/cligool-linux-riscv64 ./cmd/client && \
+    cd web/downloads && tar -czf cligool-linux-riscv64.tar.gz cligool-linux-riscv64 && rm -f cligool-linux-riscv64 && cd /app
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=s390x go build -o web/downloads/cligool-linux-s390x ./cmd/client && \
+    cd web/downloads && tar -czf cligool-linux-s390x.tar.gz cligool-linux-s390x && rm -f cligool-linux-s390x && cd /app
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=mips go build -o web/downloads/cligool-linux-mips ./cmd/client && \
+    cd web/downloads && tar -czf cligool-linux-mips.tar.gz cligool-linux-mips && rm -f cligool-linux-mips && cd /app
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=mips64le go build -o web/downloads/cligool-linux-mips64le ./cmd/client && \
+    cd web/downloads && tar -czf cligool-linux-mips64le.tar.gz cligool-linux-mips64le && rm -f cligool-linux-mips64le && cd /app
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=mips64 GOMIPS=hardfloat go build -o web/downloads/cligool-linux-mips64 ./cmd/client && \
+    cd web/downloads && tar -czf cligool-linux-mips64.tar.gz cligool-linux-mips64 && rm -f cligool-linux-mips64 && cd /app
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=loong64 go build -o web/downloads/cligool-linux-loong64 ./cmd/client && \
+    cd web/downloads && tar -czf cligool-linux-loong64.tar.gz cligool-linux-loong64 && rm -f cligool-linux-loong64 && cd /app
+
+# FreeBSD版本
+RUN CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 go build -o web/downloads/cligool-freebsd-amd64 ./cmd/client && \
+    cd web/downloads && tar -czf cligool-freebsd-amd64.tar.gz cligool-freebsd-amd64 && rm -f cligool-freebsd-amd64 && cd /app
+
+RUN CGO_ENABLED=0 GOOS=freebsd GOARCH=arm64 go build -o web/downloads/cligool-freebsd-arm64 ./cmd/client && \
+    cd web/downloads && tar -czf cligool-freebsd-arm64.tar.gz cligool-freebsd-arm64 && rm -f cligool-freebsd-arm64 && cd /app
+
+RUN CGO_ENABLED=0 GOOS=freebsd GOARCH=386 go build -o web/downloads/cligool-freebsd-386 ./cmd/client && \
+    cd web/downloads && tar -czf cligool-freebsd-386.tar.gz cligool-freebsd-386 && rm -f cligool-freebsd-386 && cd /app
+
+RUN CGO_ENABLED=0 GOOS=freebsd GOARCH=arm GOARM=6 go build -o web/downloads/cligool-freebsd-arm ./cmd/client && \
+    cd web/downloads && tar -czf cligool-freebsd-arm.tar.gz cligool-freebsd-arm && rm -f cligool-freebsd-arm && cd /app
+
+RUN CGO_ENABLED=0 GOOS=freebsd GOARCH=riscv64 go build -o web/downloads/cligool-freebsd-riscv64 ./cmd/client && \
+    cd web/downloads && tar -czf cligool-freebsd-riscv64.tar.gz cligool-freebsd-riscv64 && rm -f cligool-freebsd-riscv64 && cd /app
+
+# OpenBSD版本
+RUN CGO_ENABLED=0 GOOS=openbsd GOARCH=amd64 go build -o web/downloads/cligool-openbsd-amd64 ./cmd/client && \
+    cd web/downloads && tar -czf cligool-openbsd-amd64.tar.gz cligool-openbsd-amd64 && rm -f cligool-openbsd-amd64 && cd /app
+
+RUN CGO_ENABLED=0 GOOS=openbsd GOARCH=arm64 go build -o web/downloads/cligool-openbsd-arm64 ./cmd/client && \
+    cd web/downloads && tar -czf cligool-openbsd-arm64.tar.gz cligool-openbsd-arm64 && rm -f cligool-openbsd-arm64 && cd /app
+
+RUN CGO_ENABLED=0 GOOS=openbsd GOARCH=386 go build -o web/downloads/cligool-openbsd-386 ./cmd/client && \
+    cd web/downloads && tar -czf cligool-openbsd-386.tar.gz cligool-openbsd-386 && rm -f cligool-openbsd-386 && cd /app
+
+RUN CGO_ENABLED=0 GOOS=openbsd GOARCH=arm GOARM=6 go build -o web/downloads/cligool-openbsd-arm ./cmd/client && \
+    cd web/downloads && tar -czf cligool-openbsd-arm.tar.gz cligool-openbsd-arm && rm -f cligool-openbsd-arm && cd /app
+
+RUN CGO_ENABLED=0 GOOS=openbsd GOARCH=riscv64 go build -o web/downloads/cligool-openbsd-riscv64 ./cmd/client && \
+    cd web/downloads && tar -czf cligool-openbsd-riscv64.tar.gz cligool-openbsd-riscv64 && rm -f cligool-openbsd-riscv64 && cd /app
+
+# NetBSD版本
+RUN CGO_ENABLED=0 GOOS=netbsd GOARCH=amd64 go build -o web/downloads/cligool-netbsd-amd64 ./cmd/client && \
+    cd web/downloads && tar -czf cligool-netbsd-amd64.tar.gz cligool-netbsd-amd64 && rm -f cligool-netbsd-amd64 && cd /app
+
+RUN CGO_ENABLED=0 GOOS=netbsd GOARCH=arm64 go build -o web/downloads/cligool-netbsd-arm64 ./cmd/client && \
+    cd web/downloads && tar -czf cligool-netbsd-arm64.tar.gz cligool-netbsd-arm64 && rm -f cligool-netbsd-arm64 && cd /app
+
+RUN CGO_ENABLED=0 GOOS=netbsd GOARCH=arm GOARM=6 go build -o web/downloads/cligool-netbsd-arm ./cmd/client && \
+    cd web/downloads && tar -czf cligool-netbsd-arm.tar.gz cligool-netbsd-arm && rm -f cligool-netbsd-arm && cd /app
+
+RUN CGO_ENABLED=0 GOOS=netbsd GOARCH=386 go build -o web/downloads/cligool-netbsd-386 ./cmd/client && \
+    cd web/downloads && tar -czf cligool-netbsd-386.tar.gz cligool-netbsd-386 && rm -f cligool-netbsd-386 && cd /app
+
+# DragonFlyBSD版本
+RUN CGO_ENABLED=0 GOOS=dragonfly GOARCH=amd64 go build -o web/downloads/cligool-dragonfly-amd64 ./cmd/client && \
+    cd web/downloads && tar -czf cligool-dragonfly-amd64.tar.gz cligool-dragonfly-amd64 && rm -f cligool-dragonfly-amd64 && cd /app
+
+RUN CGO_ENABLED=0 GOOS=dragonfly GOARCH=arm64 go build -o web/downloads/cligool-dragonfly-arm64 ./cmd/client && \
+    cd web/downloads && tar -czf cligool-dragonfly-arm64.tar.gz cligool-dragonfly-arm64 && rm -f cligool-dragonfly-arm64 && cd /app
+
+# 列出所有构建的文件
+RUN echo "All built files:" && ls -lh web/downloads/
+
+# ============================================
+# 第三阶段：运行时镜像（多架构）
+# ============================================
+FROM --platform=$TARGETPLATFORM alpine:latest
+
+# 安装运行时依赖
+RUN apk --no-cache add \
+    ca-certificates \
+    tzdata \
+    curl
+
+WORKDIR /app
+
+# 从构建阶段复制二进制文件
+COPY --from=builder /app/relay-server .
+
+# 复制web界面文件
+COPY --from=builder /app/web ./web
+
+# 创建必要的目录
+RUN mkdir -p logs && \
+    chmod +x relay-server
+
+# 暴露端口
+EXPOSE 8080
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8080/api/health || exit 1
+
+# 运行服务
+CMD ["./relay-server"]
