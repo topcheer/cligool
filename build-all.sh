@@ -1,10 +1,10 @@
 #!/bin/bash
-# 构建所有平台的客户端（33个平台）
+# 构建所有平台的客户端（29个平台）
 
 set -e
 
 echo "🔨 开始构建所有平台的客户端..."
-echo "📊 目标平台：33个操作系统和架构组合"
+echo "📊 目标平台：29个操作系统和架构组合"
 echo ""
 
 # 创建输出目录
@@ -74,43 +74,36 @@ echo "📦 [20/33] 构建 FreeBSD riscv64..."
 GOOS=freebsd GOARCH=riscv64 CGO_ENABLED=0 go build -o bin/cligool-freebsd-riscv64 ./cmd/client
 
 # ==================== OpenBSD 版本 ====================
-echo "📦 [21/33] 构建 OpenBSD amd64..."
+echo "📦 [21/30] 构建 OpenBSD amd64..."
 GOOS=openbsd GOARCH=amd64 CGO_ENABLED=0 go build -o bin/cligool-openbsd-amd64 ./cmd/client
 
-echo "📦 [22/33] 构建 OpenBSD arm64..."
+echo "📦 [22/30] 构建 OpenBSD arm64..."
 GOOS=openbsd GOARCH=arm64 CGO_ENABLED=0 go build -o bin/cligool-openbsd-arm64 ./cmd/client
 
-echo "📦 [23/33] 构建 OpenBSD 386..."
-GOOS=openbsd GOARCH=386 CGO_ENABLED=0 go build -o bin/cligool-openbsd-386 ./cmd/client
-
-echo "📦 [24/33] 构建 OpenBSD arm..."
-GOOS=openbsd GOARCH=arm GOARM=6 CGO_ENABLED=0 go build -o bin/cligool-openbsd-arm ./cmd/client
-
-echo "📦 [25/33] 构建 OpenBSD riscv64..."
-GOOS=openbsd GOARCH=riscv64 CGO_ENABLED=0 go build -o bin/cligool-openbsd-riscv64 ./cmd/client
+# 注意：OpenBSD 386、arm和riscv64由于pty库限制已移除
+# pty库在OpenBSD非amd64/arm64架构上有已知限制
 
 # ==================== NetBSD 版本 ====================
-echo "📦 [26/33] 构建 NetBSD amd64..."
+echo "📦 [23/30] 构建 NetBSD amd64..."
 GOOS=netbsd GOARCH=amd64 CGO_ENABLED=0 go build -o bin/cligool-netbsd-amd64 ./cmd/client
 
-echo "📦 [27/33] 构建 NetBSD arm64..."
+echo "📦 [24/30] 构建 NetBSD arm64..."
 GOOS=netbsd GOARCH=arm64 CGO_ENABLED=0 go build -o bin/cligool-netbsd-arm64 ./cmd/client
 
-echo "📦 [28/33] 构建 NetBSD arm..."
+echo "📦 [25/30] 构建 NetBSD arm..."
 GOOS=netbsd GOARCH=arm GOARM=6 CGO_ENABLED=0 go build -o bin/cligool-netbsd-arm ./cmd/client
 
-echo "📦 [29/33] 构建 NetBSD 386..."
+echo "📦 [26/30] 构建 NetBSD 386..."
 GOOS=netbsd GOARCH=386 CGO_ENABLED=0 go build -o bin/cligool-netbsd-386 ./cmd/client
 
 # ==================== DragonFlyBSD 版本 ====================
-echo "📦 [30/33] 构建 DragonFlyBSD amd64..."
+echo "📦 [27/29] 构建 DragonFlyBSD amd64..."
 GOOS=dragonfly GOARCH=amd64 CGO_ENABLED=0 go build -o bin/cligool-dragonfly-amd64 ./cmd/client
 
-echo "📦 [31/33] 构建 DragonFlyBSD arm64..."
-GOOS=dragonfly GOARCH=arm64 CGO_ENABLED=0 go build -o bin/cligool-dragonfly-arm64 ./cmd/client
+# 注意：DragonFlyBSD arm64不被Go支持
 
 # ==================== Relay Server ====================
-echo "📦 [32/33] 构建中继服务器 (Linux amd64)..."
+echo "📦 [28/29] 构建中继服务器 (Linux amd64)..."
 GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bin/relay-server ./cmd/relay
 
 echo ""
@@ -120,11 +113,16 @@ echo "📊 构建统计："
 echo "   - macOS: 2个平台"
 echo "   - Linux: 13个平台"
 echo "   - FreeBSD: 5个平台"
-echo "   - OpenBSD: 5个平台"
+echo "   - OpenBSD: 2个平台 (仅amd64和arm64)"
 echo "   - NetBSD: 4个平台"
-echo "   - DragonFlyBSD: 2个平台"
+echo "   - DragonFlyBSD: 1个平台 (仅amd64)"
 echo "   - 中继服务器: 1个"
-echo "   总计: 32个二进制文件"
+echo "   总计: 28个二进制文件"
+echo ""
+echo "⚠️  平台限制说明："
+echo "   - OpenBSD 386/arm/riscv64: pty库限制"
+echo "   - DragonFlyBSD arm64: Go不支持"
+echo "   - Windows: 需要在Windows系统或Docker中构建"
 echo ""
 echo "📦 构建的文件："
 ls -lh bin/
