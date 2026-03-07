@@ -16,14 +16,14 @@
 - **要求**: sudo 权限
 
 ### Windows
-- **安装程序**: `windows/cligool.iss` (Inno Setup 脚本)
-- **生成文件**: `windows/output/cligool-setup.exe`
-- **支持模式**:
-  - **管理员模式**: 安装到 `Program Files`，系统级 PATH，完整功能
-  - **用户模式**: 安装到 `%LOCALAPPDATA%`，用户级 PATH，基础功能
-- **要求**:
-  - 构建: Windows + Inno Setup
-  - 安装: Windows 7+
+- **安装方式**: 使用zip压缩包
+- **下载文件**: `cligool-windows-amd64.zip` 或 `cligool-windows-arm64.zip`
+- **支持架构**: amd64, arm64
+- **安装步骤**:
+  1. 下载对应的zip文件
+  2. 解压到任意目录（如 `C:\Program Files\CliGool`）
+  3. 将目录添加到系统PATH环境变量
+  4. 在命令行中运行 `cligool.exe`
 
 ## 🚀 快速安装
 
@@ -49,14 +49,25 @@ sudo ./install.sh
 
 ### Windows
 ```powershell
-# 1. 下载安装程序
-# 从 https://github.com/topcheer/cligool/releases 下载 cligool-setup.exe
+# 1. 下载zip文件
+# 从 https://github.com/topcheer/cligool/releases 下载:
+# - cligool-windows-amd64.zip (Intel/AMD 64位)
+# - cligool-windows-arm64.zip (ARM 64位)
 
-# 2. 双击运行安装程序
-# 右键 -> "以管理员身份运行" 获得完整功能
+# 2. 解压文件
+# 右键点击zip文件 -> "解压到..."
+# 解压到您想要的目录，例如: C:\Program Files\CliGool
 
-# 或使用命令行
-cligool-setup.exe /VERYSILENT /SUPPRESSMSGBOXES
+# 3. 添加到PATH
+# 方法1：系统设置
+# - 打开"系统属性" -> "高级" -> "环境变量"
+# - 编辑"Path"变量，添加解压目录
+#
+# 方法2：PowerShell命令（需要管理员权限）
+# [Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\Program Files\CliGool", "Machine")
+
+# 4. 验证安装
+cligool --version
 ```
 
 ## 🔨 构建安装包
@@ -86,14 +97,15 @@ chmod +x install.sh
 
 #### Windows
 
-**在 Windows 上**:
-```powershell
-# 方法1：使用构建脚本
-cd installers\windows
-build.sh
+**注意**: Windows不再提供自动生成的安装程序(.exe)，请使用zip压缩包安装。
 
-# 方法2：使用 Inno Setup 编译器
-iscc cligool.iss
+**如需手动构建Windows二进制文件**:
+```powershell
+# 方法1：使用Go编译
+go build -o cligool.exe ../cmd/client
+
+# 方法2：使用GitHub Actions自动构建的zip文件
+# 从GitHub Releases下载预编译的zip文件
 ```
 
 **在 macOS/Linux 上**:
@@ -114,37 +126,13 @@ chmod +x build.sh
 - ✅ 创建桌面快捷方式（Linux）
 - ✅ 添加到 PATH
 
-### Windows (Inno Setup)
-- ✅ 自动权限检测
-- ✅ 管理员模式 vs 用户模式
-- ✅ 动态安装路径选择
-- ✅ 添加到 PATH（系统级或用户级）
-- ✅ 创建快捷方式（开始菜单、桌面、快速启动）
-- ✅ 右键菜单集成（仅管理员）
-- ✅ 配置文件初始化
-- ✅ 完整卸载支持
-
-## 🎨 Windows 安装模式详解
-
-### 管理员模式
-- **安装位置**: `C:\Program Files\CliGool`
-- **PATH**: 系统级 PATH（所有用户）
-- **功能**:
-  - ✅ 完整功能
-  - ✅ 右键菜单集成
-  - ✅ 所有用户开始菜单
-  - ✅ 系统级配置
-- **要求**: 以管理员身份运行安装程序
-
-### 用户模式
-- **安装位置**: `%LOCALAPPDATA%\CliGool` (通常 `C:\Users\YourName\AppData\Local\CliGool`)
-- **PATH**: 用户级 PATH（仅当前用户）
-- **功能**:
-  - ✅ 基础功能
-  - ✅ 用户开始菜单
-  - ✅ 用户配置
-  - ❌ 右键菜单集成（需要管理员权限）
-- **要求**: 无特殊要求
+### Windows (zip压缩包)
+- ✅ 跨架构支持（amd64/arm64）
+- ✅ 绿色软件，无需安装
+- ✅ 可移植到任意目录
+- ✅ 支持手动配置PATH
+- ✅ 支持自定义配置文件
+- ✅ 可多个版本并存
 
 ## 🗑️ 卸载
 
@@ -164,9 +152,17 @@ rm -f ~/.local/share/applications/cligool.desktop
 ```
 
 ### Windows
-- **方法1**: 控制面板 → 程序和功能 → CliGool → 卸载
-- **方法2**: 开始菜单 → CliGool → 卸载 CliGool
-- **方法3**: 运行安装目录中的 `unins000.exe`
+```powershell
+# 1. 删除解压目录
+Remove-Item "C:\Program Files\CliGool" -Recurse -Force
+
+# 2. 从PATH移除
+# 系统设置 -> 高级 -> 环境变量 -> 编辑Path -> 删除CliGool目录
+
+# 3. 删除配置文件（可选）
+Remove-Item $env:USERPROFILE\.cligool.json -Force
+Remove-Item $env:USERPROFILE\.cligool -Recurse -Force
+```
 
 ## ⚙️ 高级配置
 
@@ -179,8 +175,8 @@ INSTALL_DIR=/opt/cligool bash install.sh
 ```
 
 **Windows**:
-- 运行安装程序
-- 在安装目录页面选择自定义路径
+- 解压zip文件到任意目录即可
+- 推荐目录：`C:\Program Files\CliGool` 或 `C:\CliGool`
 
 ### 仅下载不安装
 
@@ -193,8 +189,16 @@ chmod +x cligool-darwin-arm64
 ```
 
 **Windows**:
-- 使用便携版（如果提供）
-- 或下载 .zip 解压后直接运行
+```powershell
+# 下载zip文件到当前目录
+Invoke-WebRequest -Uri "https://github.com/topcheer/cligool/releases/latest/download/cligool-windows-amd64.zip" -OutFile "cligool-windows-amd64.zip"
+
+# 解压文件
+Expand-Archive -Path cligool-windows-amd64.zip -DestinationPath .
+
+# 直接运行
+.\cligool-windows-amd64.exe
+```
 
 ## 🐛 故障排除
 
@@ -221,26 +225,27 @@ source ~/.zshrc  # 或 source ~/.bash_profile
 
 ### Windows
 
-#### 问题：无法添加到 PATH
-- **原因**: 权限不足
+#### 问题：无法在命令行中使用cligool
+- **原因**: 目录未添加到PATH
 - **解决方案**:
-  1. 以管理员身份运行安装程序
-  2. 或手动添加到 PATH:
-     - 系统属性 → 高级 → 环境变量
-     - 编辑 Path 变量，添加安装目录
+  ```powershell
+  # 临时添加（当前会话有效）
+  $env:Path += ";C:\Program Files\CliGool"
 
-#### 问题：右键菜单不显示
-- **原因**: 安装时未选择右键菜单集成，或不是管理员模式
-- **解决方案**:
-  1. 重新运行安装程序（管理员模式）
-  2. 勾选"添加右键菜单"选项
+  # 永久添加（需要管理员权限）
+  [Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\Program Files\CliGool", "Machine")
+  ```
 
-#### 问题：安装程序无法运行
-- **原因**: Windows Defender 或其他杀毒软件拦截
+#### 问题：杀毒软件警告
+- **原因**: 未知软件，没有数字签名
 - **解决方案**:
   1. 临时禁用杀毒软件
   2. 添加到信任列表
-  3. 下载时点击"保留"
+  3. 下载时点击"保留文件"
+
+#### 问题：找不到vcruntime140.dll等依赖
+- **原因**: 缺少Visual C++运行库
+- **解决方案**: CliGool是纯Go编译，不依赖外部DLL
 
 ## 📝 许可证
 

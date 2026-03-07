@@ -105,3 +105,6 @@ MEMORY.md
 # 会话文件
 *.session# 下载文件（在Docker构建时生成）
 web/downloads/
+
+# 清理备份目录
+.cleanup_backup_*/
