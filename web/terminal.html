@@ -113,6 +113,29 @@
             color: #8a8a8a;
             display: flex;
             justify-content: space-between;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        /* 隐藏页头和页脚的样式 */
+        .header.hidden,
+        .footer.hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-20px);
+        }
+
+        .footer.hidden {
+            transform: translateY(20px);
+        }
+
+        /* 隐藏页头时，终端容器占据全部空间 */
+        body.has-connected .header,
+        body.has-connected .footer {
+            display: none;
+        }
+
+        body.has-connected .terminal-container {
+            padding: 0;
         }
     </style>
 </head>
@@ -157,6 +180,7 @@
         let webglAddon = null;
         let ws = null;
         let clientOS = 'unknown'; // 客户端操作系统类型
+        let hasReceivedFirstMessage = false; // 是否已接收过第一个WebSocket消息
 
         // 从URL获取会话ID
         const pathParts = window.location.pathname.split('/');
@@ -235,11 +259,8 @@
                 fitAddon.fit();
             });
 
-            // 欢迎信息
-            terminal.writeln('✨ 欢迎使用 CliGool 远程终端！');
-            terminal.writeln(`📋 会话ID: ${sessionId}`);
-            terminal.writeln(`🔧 正在连接到服务器...`);
-            terminal.writeln('');
+            // 注意：不在这里显示欢迎信息，避免闪烁
+            // 等待WebSocket连接并接收消息后再显示内容
 
             // 终端输入处理
             terminal.onData(data => {
@@ -282,15 +303,19 @@
             // 构建WebSocket URL
             const wsUrl = `${serverUrl}/api/terminal/${sessionId}?type=web&user_id=web-${Date.now()}`;
 
-            terminal.writeln(`🔧 WebSocket连接: ${wsUrl}`);
-            terminal.writeln('');
+            // 注意：不在这里显示连接信息，避免闪烁
 
             try {
                 ws = new WebSocket(wsUrl);
 
                 ws.onopen = () => {
-                    terminal.writeln('✅ WebSocket连接已建立');
                     updateConnectionStatus('connected');
+
+                    // 自动隐藏页头和页尾
+                    document.body.classList.add('has-connected');
+                    document.querySelector('.header').classList.add('hidden');
+                    document.querySelector('.footer').classList.add('hidden');
+
                     // 不在这里发送回车，等待init消息后再发送
                 };
 
@@ -299,53 +324,68 @@
                         const msg = JSON.parse(event.data);
                         handleTerminalMessage(msg);
                     } catch (e) {
-                        terminal.writeln(`❌ 解析消息失败: ${e.message}`);
                         console.error('解析消息失败:', e, event.data);
                     }
                 };
 
                 ws.onerror = (error) => {
-                    terminal.writeln(`❌ WebSocket错误`);
                     console.error('WebSocket错误:', error);
                     updateConnectionStatus('disconnected');
                 };
 
                 ws.onclose = (event) => {
-                    terminal.writeln(`❌ 连接已断开: code=${event.code}`);
                     console.log('WebSocket关闭:', event);
                     updateConnectionStatus('disconnected');
+
+                    // 重新显示页头和页尾
+                    document.body.classList.remove('has-connected');
+                    document.querySelector('.header').classList.remove('hidden');
+                    document.querySelector('.footer').classList.remove('hidden');
                 };
 
             } catch (error) {
-                terminal.writeln(`❌ 连接失败: ${error.message}`);
                 console.error('连接失败:', error);
                 updateConnectionStatus('disconnected');
             }
         }
 
+        // 用于跟踪是否收到过缓存消息
+        let hasReceivedCachedMessages = false;
+
         function handleTerminalMessage(msg) {
+            // 处理第一个WebSocket消息：清理终端
+            if (!hasReceivedFirstMessage) {
+                terminal.reset(); // 清空终端
+                hasReceivedFirstMessage = true;
+                console.log('🧹 已清理终端，开始渲染WebSocket消息');
+            }
+
             switch (msg.type) {
+                case 'no_cli':
+                    // 没有CLI客户端连接，显示帮助信息
+                    terminal.reset(); // 清空终端
+                    displayNoCliMessage(msg.data);
+                    break;
                 case 'init':
-                    // 记录客户端操作系统类型
+                    // 记录客户端操作系统类型（仅用于日志，不显示）
                     clientOS = msg.os_info || 'unknown';
                     console.log('💻 检测到客户端系统:', clientOS);
 
-                    // 初始化消息，显示欢迎信息和提示符
-                    terminal.writeln('\x1b[32m✅ CliGool 远程终端已连接\x1b[0m');
-                    terminal.writeln('');
-                    terminal.writeln(`\x1b[36m工作目录:\x1b[0m ${msg.working_dir || 'unknown'}`);
-                    terminal.writeln(`\x1b[36m系统类型:\x1b[0m ${msg.os_info || 'unknown'}`);
-                    terminal.writeln('');
-                    terminal.writeln('\x1b[1m💡 现在可以输入命令了\x1b[0m');
-                    terminal.writeln('');
-
-                    // 发送回车符显示提示符（根据系统类型使用正确的换行符）
-                    setTimeout(() => {
-                        sendEnterKey();
-                    }, 500);
+                    // 不显示任何欢迎信息，只显示纯净的终端内容
+                    // 检查是否收到过缓存消息
+                    // 如果有缓存消息，说明已经有终端输出（包括提示符），不需要发送回车
+                    // 如果没有缓存消息，需要发送回车来触发显示提示符
+                    if (!hasReceivedCachedMessages) {
+                        // 发送回车符显示提示符（根据系统类型使用正确的换行符）
+                        setTimeout(() => {
+                            sendEnterKey();
+                        }, 500);
+                    }
                     break;
                 case 'output':
                     if (msg.data && msg.data.length > 0) {
+                        // 标记已收到缓存消息
+                        hasReceivedCachedMessages = true;
                         terminal.write(msg.data);
                     }
                     break;
@@ -360,7 +400,18 @@
                     break;
                 case 'close':
                     terminal.writeln('');
-                    terminal.writeln('❌ 会话已关闭');
+                    if (msg.data && msg.data.includes('CLI客户端已断开')) {
+                        terminal.writeln('\x1b[31m❌ CLI客户端已断开连接\x1b[0m');
+                        terminal.writeln('');
+                        terminal.writeln('\x1b[33m⚠️  远程终端已关闭\x1b[0m');
+                        terminal.writeln('\x1b[36m💡 提示: 请确保CLI客户端正在运行\x1b[0m');
+                    } else {
+                        terminal.writeln('\x1b[31m❌ 会话已关闭\x1b[0m');
+                        if (msg.data) {
+                            terminal.writeln(`\x1b[90m${msg.data}\x1b[0m`);
+                        }
+                    }
+                    terminal.writeln('');
                     disconnect();
                     break;
                 case 'ping':
@@ -397,6 +448,59 @@
                 ws = null;
             }
             updateConnectionStatus('disconnected');
+        }
+
+        function displayNoCliMessage(message) {
+            // 清空终端并显示友好的帮助信息
+            terminal.writeln('\x1b[2J\x1b[H'); // 清屏并移动到首页
+            terminal.writeln('');
+
+            // 标题
+            terminal.writeln('\x1b[1;33m╔═══════════════════════════════════════════════════════════════╗\x1b[0m');
+            terminal.writeln('\x1b[1;33m║\x1b[37m               ⚠️  CLI客户端未连接                              \x1b[33m║\x1b[0m');
+            terminal.writeln('\x1b[1;33m╠═══════════════════════════════════════════════════════════════╣\x1b[0m');
+            terminal.writeln('\x1b[1;33m║\x1b[0m \x1b[1;37m请先启动CLI客户端，然后再刷新此页面\x1b[0m                        \x1b[1;33m║\x1b[0m');
+            terminal.writeln('\x1b[1;33m╚═══════════════════════════════════════════════════════════════╝\x1b[0m');
+            terminal.writeln('');
+
+            // 显示消息内容
+            if (message) {
+                const lines = message.split('\n');
+                lines.forEach(line => {
+                    if (line.includes('⚠️')) {
+                        terminal.writeln(`\x1b[1;33m${line}\x1b[0m`);
+                    } else if (line.includes('💡')) {
+                        terminal.writeln(`\x1b[1;36m${line}\x1b[0m`);
+                    } else if (line.includes('📥')) {
+                        terminal.writeln(`\x1b[1;32m${line}\x1b[0m`);
+                    } else if (line.includes('./cligool') || line.includes('cligool-')) {
+                        // 高亮显示命令示例
+                        terminal.writeln(`\x1b[1;32m  ${line}\x1b[0m`);
+                    } else if (line.includes('命令') || line.includes('运行')) {
+                        terminal.writeln(`\x1b[1;37m${line}\x1b[0m`);
+                    } else if (line.includes('http')) {
+                        terminal.writeln(`\x1b[1;34m${line}\x1b[0m`);
+                    } else if (line.trim() !== '') {
+                        terminal.writeln(`  ${line}`);
+                    }
+                });
+            }
+
+            terminal.writeln('');
+            terminal.writeln('\x1b[1;36m💡 提示：\x1b[0m');
+            terminal.writeln('  1. 复制上面的命令到终端执行');
+            terminal.writeln('  2. 或者编辑 ~/.cligool.json 配置文件');
+            terminal.writeln('  3. 启动CLI客户端后刷新此页面');
+            terminal.writeln('');
+
+            // 添加"复制命令"功能提示
+            terminal.writeln('\x1b[1;37m─────────────────────────────────────────────────────────────\x1b[0m');
+            terminal.writeln('');
+
+            // 禁用终端输入（因为没有CLI连接）
+            terminal.writeln('\x1b[90m等待CLI客户端连接...\x1b[0m');
+            terminal.writeln('\x1b[90m(终端已禁用，请启动CLI客户端后刷新页面)\x1b[0m');
+            terminal.writeln('');
         }
 
         function updateConnectionStatus(status) {

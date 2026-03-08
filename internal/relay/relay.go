@@ -2,8 +2,10 @@ package relay
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"runtime"
 	"sync"
 	"time"
 
@@ -31,6 +33,14 @@ type TerminalMessage struct {
 	OSInfo     string `json:"os_info,omitempty"`     // 操作系统信息
 }
 
+// CachedMessage 缓存的消息（只保存必要字段以节省内存）
+type CachedMessage struct {
+	Type string `json:"type"`
+	Data string `json:"data"`
+	Rows int    `json:"rows,omitempty"`
+	Cols int    `json:"cols,omitempty"`
+}
+
 // Session 终端会话
 type Session struct {
 	ID               string
@@ -44,6 +54,9 @@ type Session struct {
 	LastPing         time.Time // 最后一次收到ping的时间
 	WorkingDirectory string   // 客户端当前工作目录
 	OSInfo           string   // 客户端操作系统信息
+	MessageCache     []CachedMessage // CLI消息缓存（当无Web客户端时）
+	CacheSizeLimit   int            // 缓存大小限制（条数）
+	TotalCacheSize   int            // 缓存总大小（字节）
 }
 
 // Service 中继服务
@@ -125,6 +138,22 @@ func (s *Service) HandleTerminalConnection(c *gin.Context) {
 		// 设置ping handler
 		s.setupPingHandler(conn, session, userID)
 
+		// 检查是否有CLI客户端连接
+		session.Mutex.RLock()
+		cliConnected := session.ClientCon != nil
+		session.Mutex.RUnlock()
+
+		if !cliConnected {
+			// 没有CLI客户端连接，发送提示消息
+			log.Printf("⚠️  Web客户端连接但无CLI客户端，发送提示消息")
+			s.sendNoCliClientMessage(session, conn)
+			// 注意：不要调用 handleWebClient，因为已经发送了提示消息
+			return
+		}
+
+		// 先发送缓存的CLI消息（如果有）
+		s.sendCachedMessages(session, conn)
+
 		// 如果会话已有初始化信息，发送给新连接的Web客户端
 		session.Mutex.RLock()
 		hasInit := session.WorkingDirectory != "" || session.OSInfo != ""
@@ -152,6 +181,176 @@ func (s *Service) HandleTerminalConnection(c *gin.Context) {
 	}
 }
 
+// addToCache 添加消息到缓存（使用简单的FIFO策略）
+func (s *Service) addToCache(session *Session, msg TerminalMessage) {
+	session.Mutex.Lock()
+	defer session.Mutex.Unlock()
+
+	// 检查缓存大小限制
+	if len(session.MessageCache) >= session.CacheSizeLimit {
+		// 移除最旧的消息（第一个）
+		removed := session.MessageCache[0]
+		session.TotalCacheSize -= len(removed.Data) + len(removed.Type)
+		session.MessageCache = session.MessageCache[1:]
+	}
+
+	// 添加新消息到缓存
+	cachedMsg := CachedMessage{
+		Type: msg.Type,
+		Data: msg.Data,
+		Rows: msg.Rows,
+		Cols: msg.Cols,
+	}
+	session.MessageCache = append(session.MessageCache, cachedMsg)
+	session.TotalCacheSize += len(msg.Data) + len(msg.Type)
+
+	log.Printf("📦 消息已缓存: cache_size=%d/%d, total_bytes=%d, type=%s",
+		len(session.MessageCache), session.CacheSizeLimit, session.TotalCacheSize, msg.Type)
+}
+
+// sendCachedMessages 发送缓存的消息给新连接的Web客户端
+func (s *Service) sendCachedMessages(session *Session, conn *websocket.Conn) {
+	session.Mutex.RLock()
+	cache := make([]CachedMessage, len(session.MessageCache))
+	copy(cache, session.MessageCache)
+	session.Mutex.RUnlock()
+
+	if len(cache) == 0 {
+		log.Printf("📭 缓存为空，无需发送历史消息")
+		return
+	}
+
+	log.Printf("📤 开始发送缓存消息: %d 条", len(cache))
+
+	for i, cachedMsg := range cache {
+		msg := TerminalMessage{
+			Type:   cachedMsg.Type,
+			Data:   cachedMsg.Data,
+			Rows:   cachedMsg.Rows,
+			Cols:   cachedMsg.Cols,
+			Session: session.ID,
+		}
+
+		err := conn.WriteJSON(msg)
+		if err != nil {
+			log.Printf("❌ 发送缓存消息失败 [%d/%d]: %v", i+1, len(cache), err)
+			return
+		}
+	}
+
+	log.Printf("✅ 缓存消息发送完成: %d 条", len(cache))
+}
+
+// sendNoCliClientMessage 发送无CLI客户端的提示消息
+func (s *Service) sendNoCliClientMessage(session *Session, conn *websocket.Conn) {
+	// 构建提示消息，包含命令示例
+	hintMsg := TerminalMessage{
+		Type:   "no_cli",
+		Data:   buildNoCliHintMessage(session.ID),
+		Session: session.ID,
+	}
+
+	jsonData, _ := json.Marshal(hintMsg)
+	if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
+		log.Printf("❌ 发送无CLI提示消息失败: %v", err)
+	} else {
+		log.Printf("✅ 已发送无CLI提示消息给Web客户端")
+	}
+}
+
+// buildNoCliHintMessage 构建无CLI客户端的提示消息
+func buildNoCliHintMessage(sessionID string) string {
+	// 检测操作系统
+	ostype := runtime.GOOS
+
+	// 根据操作系统生成不同的命令示例
+	var cmdExample string
+	switch ostype {
+	case "darwin":
+		if runtime.GOARCH == "arm64" {
+			cmdExample = `./cligool-darwin-arm64 -server http://localhost:8081 -session %s`
+		} else {
+			cmdExample = `./cligool-darwin-amd64 -server http://localhost:8081 -session %s`
+		}
+	case "linux":
+		if runtime.GOARCH == "amd64" {
+			cmdExample = `./cligool-linux-amd64 -server http://localhost:8081 -session %s`
+		} else if runtime.GOARCH == "arm64" {
+			cmdExample = `./cligool-linux-arm64 -server http://localhost:8081 -session %s`
+		} else {
+			cmdExample = `./cligool-linux-$(uname -m) -server http://localhost:8081 -session %s`
+		}
+	case "windows":
+		if runtime.GOARCH == "amd64" {
+			cmdExample = `cligool-windows-amd64.exe -server http://localhost:8081 -session %s`
+		} else {
+			cmdExample = `cligool-windows-arm64.exe -server http://localhost:8081 -session %s`
+		}
+	default:
+		cmdExample = `./cligool -server http://localhost:8081 -session %s`
+	}
+
+	// 格式化提示消息
+	hint := fmt.Sprintf(`⚠️  CLI客户端未连接
+
+请先启动CLI客户端，然后再刷新此页面。
+
+启动命令示例：
+%s
+
+或者使用配置文件：
+1. 编辑 ~/.cligool.json 设置服务器地址
+2. 运行: ./cligool -session %s
+
+💡 提示：
+- CLI客户端必须在Web客户端之前启动
+- 确保使用相同的session ID
+- 检查防火墙设置
+
+📥 下载客户端：
+- https://cligool.zty8.cn/`, fmt.Sprintf(cmdExample, sessionID), sessionID)
+
+	return hint
+}
+
+// notifyWebClientsClientDisconnected 通知所有Web客户端CLI已断开
+func (s *Service) notifyWebClientsClientDisconnected(session *Session) {
+	session.Mutex.Lock()
+	defer session.Mutex.Unlock()
+
+	webClientCount := len(session.Clients)
+	if webClientCount == 0 {
+		log.Printf("📭 没有Web客户端需要通知")
+		return
+	}
+
+	log.Printf("📡 通知 %d 个Web客户端: CLI已断开", webClientCount)
+
+	// 创建关闭消息
+	closeMsg := TerminalMessage{
+		Type:   "close",
+		Data:   "CLI客户端已断开连接",
+		Session: session.ID,
+	}
+	jsonData, _ := json.Marshal(closeMsg)
+
+	// 向所有Web客户端发送关闭消息
+	for userID, conn := range session.Clients {
+		if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
+			log.Printf("❌ 发送关闭消息失败给Web客户端 %s: %v", userID, err)
+		} else {
+			log.Printf("✅ 已通知Web客户端: %s", userID)
+		}
+
+		// 关闭Web客户端连接
+		conn.Close()
+	}
+
+	// 清空Web客户端列表
+	session.Clients = make(map[string]*websocket.Conn)
+	log.Printf("🧹 已清理所有Web客户端连接")
+}
+
 // handleClientConnection 处理CLI客户端连接
 func (s *Service) handleClientConnection(session *Session) {
 	conn := session.ClientCon
@@ -161,7 +360,7 @@ func (s *Service) handleClientConnection(session *Session) {
 		var msg TerminalMessage
 		err := conn.ReadJSON(&msg)
 		if err != nil {
-			log.Printf("Client connection error: %v", err)
+			log.Printf("❌ CLI客户端连接断开: %v", err)
 			break
 		}
 
@@ -184,6 +383,10 @@ func (s *Service) handleClientConnection(session *Session) {
 		// 广播消息给所有Web客户端
 		s.broadcastToWebClients(session, msg)
 	}
+
+	// CLI客户端断开，通知所有Web客户端
+	log.Printf("🔔 通知所有Web客户端: CLI已断开")
+	s.notifyWebClientsClientDisconnected(session)
 
 	// 清理连接
 	session.Mutex.Lock()
@@ -230,12 +433,22 @@ func (s *Service) handleWebClient(session *Session, userID string) {
 	session.Mutex.Unlock()
 }
 
-// broadcastToWebClients 广播消息给所有Web客户端
+// broadcastToWebClients 广播消息给所有Web客户端，如果没有Web客户端则缓存
 func (s *Service) broadcastToWebClients(session *Session, msg TerminalMessage) {
+	session.Mutex.RLock()
+	webClientCount := len(session.Clients)
+	session.Mutex.RUnlock()
+
+	// 如果没有Web客户端连接，缓存消息
+	if webClientCount == 0 {
+		s.addToCache(session, msg)
+		return
+	}
+
+	// 有Web客户端，实时广播
 	session.Mutex.RLock()
 	defer session.Mutex.RUnlock()
 
-	webClientCount := len(session.Clients)
 	log.Printf("📡 广播消息到 %d 个Web客户端: type=%s, data_len=%d",
 		webClientCount, msg.Type, len(msg.Data))
 
@@ -260,12 +473,14 @@ func (s *Service) getOrCreateSession(sessionID, owner string) *Session {
 
 	// 创建新会话
 	session := &Session{
-		ID:        sessionID,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-		Owner:     owner,
-		Clients:   make(map[string]*websocket.Conn),
-		Active:    false,
+		ID:             sessionID,
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+		Owner:          owner,
+		Clients:        make(map[string]*websocket.Conn),
+		Active:         false,
+		MessageCache:   make([]CachedMessage, 0, 1000), // 预分配1000条容量
+		CacheSizeLimit: 1000,                            // 最多缓存1000条消息
 	}
 
 	s.Sessions[sessionID] = session

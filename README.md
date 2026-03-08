@@ -17,6 +17,7 @@
 - 💎 **真实PTY**：完整的终端特性支持（颜色、光标控制等）
 - 🤖 **AI CLI工具**：完美支持Claude、Gemini、Aider等AI CLI工具
 - 👥 **多用户协作**：多人可同时连接同一终端会话
+- 📦 **消息缓存**：无Web客户端时自动缓存CLI消息，连接时自动恢复历史
 - 🚀 **开箱即用**：Docker一键部署，无需复杂配置
 - 🎨 **现代Web界面**：基于xterm.js的专业终端UI
 - 💓 **心跳保活**：双向心跳机制，自动重连和死连接清理
@@ -147,7 +148,19 @@ go run ./cmd/relay
 
 # 运行带参数的命令
 ./cligool -cmd git -args "status"
+
+# 禁止自动打开浏览器
+./cligool -server http://localhost:8081 -no-browser
 ```
+
+**常用参数**：
+- `-server` : 中继服务器地址
+- `-session` : 指定会话ID
+- `-cols` / `-rows` : 设置终端大小（0=自动检测）
+- `-cmd` : 直接执行指定命令
+- `-args` : 传递给命令的参数
+- `-proxy` : 使用代理服务器
+- `-no-browser` : 禁止自动打开浏览器
 
 **配置文件支持**：
 CliGool 支持配置文件来设置常用参数：

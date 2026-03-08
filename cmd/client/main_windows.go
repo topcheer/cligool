@@ -454,6 +454,7 @@ func main() {
 	rows := flag.Int("rows", config.Rows, "终端行数（0=自动检测）")
 	execCmd := flag.String("cmd", "", "直接执行的命令（如 claude, gemini 等）")
 	execArgs := flag.String("args", "", "传递给命令的参数（可选，用空格分隔）")
+	noBrowser := flag.Bool("no-browser", config.NoBrowser, "禁止自动打开浏览器")
 	flag.Parse()
 
 	// 显示代理信息
@@ -507,7 +508,7 @@ func main() {
 	log.Println("开始连接WebSocket...")
 
 	// 启动WebSocket并运行终端会话
-	if err := runTerminalSession(*serverURL, *proxyURL, sid, *cols, *rows, commandPath, cmdArgs); err != nil {
+	if err := runTerminalSession(*serverURL, *proxyURL, sid, *cols, *rows, commandPath, cmdArgs, *noBrowser); err != nil {
 		log.Printf("终端会话失败: %v", err)
 		fmt.Printf("连接失败: %v\n", err)
 		os.Exit(1)
@@ -532,7 +533,7 @@ func printHeader(sessionID, serverURL, proxyURL string) {
 	fmt.Println()
 }
 
-func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, commandPath string, cmdArgs []string) error {
+func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, commandPath string, cmdArgs []string, noBrowser bool) error {
 	log.Println("开始建立WebSocket连接...")
 
 	// 建立 WebSocket 连接
@@ -558,7 +559,33 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 	if err != nil {
 		return fmt.Errorf("WebSocket连接失败: %w", err)
 	}
-	defer conn.Close()
+
+	// 确保在退出时总是通知 relay 服务器
+	var sessionError error
+	defer func() {
+		// 发送关闭消息
+		closeMsg := TerminalMessage{
+			Type:   "close",
+			Session: sessionID,
+			UserID:  "client",
+		}
+
+		if sessionError != nil {
+			closeMsg.Data = fmt.Sprintf("客户端错误: %v", sessionError)
+			log.Printf("❌ 发送错误关闭消息: %v", sessionError)
+		} else {
+			closeMsg.Data = "客户端正常退出"
+			log.Printf("✅ 发送正常关闭消息")
+		}
+
+		jsonData, _ := json.Marshal(closeMsg)
+		if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
+			log.Printf("❌ 发送关闭消息失败: %v", err)
+		}
+
+		// 关闭 WebSocket 连接
+		conn.Close()
+	}()
 
 	log.Println("WebSocket已连接")
 	fmt.Println("已连接到中继服务器")
@@ -566,32 +593,34 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 	fmt.Println("Windows模式：使用ConPTY，支持完整终端特性")
 	fmt.Println()
 
-	// 发送系统通知并自动打开浏览器
-	cleanURL := strings.TrimSuffix(serverURL, "/")
-	webURL := fmt.Sprintf("%s/session/%s", cleanURL, sessionID)
+	// 发送系统通知并自动打开浏览器（除非用户指定 -no-browser）
+	if !noBrowser {
+		cleanURL := strings.TrimSuffix(serverURL, "/")
+		webURL := fmt.Sprintf("%s/session/%s", cleanURL, sessionID)
 
-	// Windows: 使用简单的方法打开浏览器
-	go func() {
-		// 方法1: 使用 rundll32 打开 URL
-		cmd := exec.Command("rundll32", "url.dll,FileProtocolHandler", webURL)
-		if err := cmd.Run(); err != nil {
-			// 方法2: 降级到 cmd start
-			exec.Command("cmd", "/c", "start", "", webURL).Run()
-		}
-	}()
+		// Windows: 使用简单的方法打开浏览器
+		go func() {
+			// 方法1: 使用 rundll32 打开 URL
+			cmd := exec.Command("rundll32", "url.dll,FileProtocolHandler", webURL)
+			if err := cmd.Run(); err != nil {
+				// 方法2: 降级到 cmd start
+				exec.Command("cmd", "/c", "start", "", webURL).Run()
+			}
+		}()
 
-	// 可选：显示简单的 Toast 通知（Windows 10+）
-	go func() {
-		// 使用 PowerShell 的 BurntToast 模块（如果可用）
-		psScript := fmt.Sprintf(
-			`try { Import-Module BurntToast; New-BurntToastNotification -Title '🌐 CliGool Web 终端' -Message '%s' } catch {}`,
-			webURL,
-		)
-		exec.Command("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", psScript).Run()
-	}()
+		// 可选：显示简单的 Toast 通知（Windows 10+）
+		go func() {
+			// 使用 PowerShell 的 BurntToast 模块（如果可用）
+			psScript := fmt.Sprintf(
+				`try { Import-Module BurntToast; New-BurntToastNotification -Title '🌐 CliGool Web 终端' -Message '%s' } catch {}`,
+				webURL,
+			)
+			exec.Command("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", psScript).Run()
+		}()
 
-	log.Printf("✅ 已在浏览器中打开: %s", webURL)
-	fmt.Println("📱 已发送系统通知并在浏览器中打开 Web 终端")
+		log.Printf("✅ 已在浏览器中打开: %s", webURL)
+		fmt.Println("📱 已发送系统通知并在浏览器中打开 Web 终端")
+	}
 	fmt.Println()
 
 	// 创建WebSocket写入channel，确保串行写入
@@ -630,7 +659,8 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 	log.Println("创建ConPTY...")
 	pc, err := newPseudoConsole(int16(cols), int16(rows))
 	if err != nil {
-		return fmt.Errorf("创建ConPTY失败: %w", err)
+		sessionError = fmt.Errorf("创建ConPTY失败: %w", err)
+		return sessionError
 	}
 	defer pc.close()
 
@@ -832,7 +862,8 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 			if err == io.EOF {
 				return nil
 			}
-			return fmt.Errorf("ConPTY读取失败: %w", err)
+			sessionError = fmt.Errorf("ConPTY读取失败: %w", err)
+			return sessionError
 		}
 
 		data := buf[:n]

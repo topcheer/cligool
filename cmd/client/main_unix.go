@@ -55,6 +55,7 @@ func main() {
 	rows := flag.Int("rows", config.Rows, "终端行数（0=自动检测）")
 	execCmd := flag.String("cmd", "", "直接执行的命令（如 claude, gemini 等）")
 	execArgs := flag.String("args", "", "传递给命令的参数（可选，用空格分隔）")
+	noBrowser := flag.Bool("no-browser", config.NoBrowser, "禁止自动打开浏览器")
 	flag.Parse()
 
 	// 显示代理信息
@@ -105,8 +106,10 @@ func main() {
 	printHeader(sid, *serverURL, *proxyURL)
 
 	// 启动WebSocket并运行PTY
-	if err := runTerminalSession(*serverURL, *proxyURL, sid, *cols, *rows, commandPath, cmdArgs); err != nil {
-		log.Fatalf("终端会话失败: %v", err)
+	if err := runTerminalSession(*serverURL, *proxyURL, sid, *cols, *rows, commandPath, cmdArgs, *noBrowser); err != nil {
+		log.Printf("❌ 终端会话失败: %v", err)
+		fmt.Printf("\n❌ 错误: %v\n", err)
+		os.Exit(1)
 	}
 }
 
@@ -128,7 +131,7 @@ func printHeader(sessionID, serverURL, proxyURL string) {
 	fmt.Println()
 }
 
-func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, commandPath string, cmdArgs []string) error {
+func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, commandPath string, cmdArgs []string, noBrowser bool) error {
 	// 建立 WebSocket 连接
 	wsURL, _ := buildWebSocketURL(serverURL, sessionID)
 
@@ -150,18 +153,46 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 	if err != nil {
 		return fmt.Errorf("WebSocket连接失败: %w", err)
 	}
-	defer conn.Close()
+
+	// 确保在退出时总是通知 relay 服务器
+	var sessionError error
+	defer func() {
+		// 发送关闭消息
+		closeMsg := TerminalMessage{
+			Type:   "close",
+			Session: sessionID,
+			UserID:  "client",
+		}
+
+		if sessionError != nil {
+			closeMsg.Data = fmt.Sprintf("客户端错误: %v", sessionError)
+			log.Printf("❌ 发送错误关闭消息: %v", sessionError)
+		} else {
+			closeMsg.Data = "客户端正常退出"
+			log.Printf("✅ 发送正常关闭消息")
+		}
+
+		jsonData, _ := json.Marshal(closeMsg)
+		if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
+			log.Printf("❌ 发送关闭消息失败: %v", err)
+		}
+
+		// 关闭 WebSocket 连接
+		conn.Close()
+	}()
 
 	log.Println("✅ WebSocket已连接")
 	fmt.Println("✅ 已连接到中继服务器")
 	fmt.Println("💡 现在可以在Web终端中输入命令了")
 
-	// 发送系统通知并自动打开浏览器
-	cleanURL := strings.TrimSuffix(serverURL, "/")
-	webURL := fmt.Sprintf("%s/session/%s", cleanURL, sessionID)
-	notifier := NewSystemNotifier()
-	if err := notifier.SendWebTerminalNotification(webURL); err == nil {
-		fmt.Println("📱 已发送系统通知并在浏览器中打开 Web 终端")
+	// 发送系统通知并自动打开浏览器（除非用户指定 -no-browser）
+	if !noBrowser {
+		cleanURL := strings.TrimSuffix(serverURL, "/")
+		webURL := fmt.Sprintf("%s/session/%s", cleanURL, sessionID)
+		notifier := NewSystemNotifier()
+		if err := notifier.SendWebTerminalNotification(webURL); err == nil {
+			fmt.Println("📱 已发送系统通知并在浏览器中打开 Web 终端")
+		}
 	}
 	fmt.Println()
 
@@ -260,7 +291,8 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 	// 启动PTY
 	ptmx, err := pty.Start(command)
 	if err != nil {
-		return fmt.Errorf("启动PTY失败: %w", err)
+		sessionError = fmt.Errorf("启动PTY失败: %w", err)
+		return sessionError
 	}
 	defer ptmx.Close()
 
@@ -390,7 +422,8 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 			if err == io.EOF {
 				return nil
 			}
-			return fmt.Errorf("PTY读取失败: %w", err)
+			sessionError = fmt.Errorf("PTY读取失败: %w", err)
+			return sessionError
 		}
 
 		data := buf[:n]
