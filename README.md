@@ -215,14 +215,15 @@ open https://dashboard.render.com/blueprints/new
 
 #### Railway 部署
 
-```bash
-# 1. 访问 Railway
-open https://railway.app
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com?referralCode=V6e2VV)
 
-# 2. 点击 "Deploy from GitHub"
+*新用户可得 $20 免费额度*
+
+```bash
+# 1. 点击上方按钮访问 Railway
+# 2. 连接 GitHub 账号
 # 3. 选择 topcheer/cligool 仓库
-# 4. Railway 自动检测 railway.toml 配置
-# 5. 部署完成，获得 URL
+# 4. 等待自动部署完成
 ```
 
 #### Koyeb 部署
