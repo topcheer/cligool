@@ -147,6 +147,16 @@ export RELAY_PORT=8080
 
 Don't want to maintain your own server? Deploy to free cloud platforms with one click!
 
+#### Pre-Deployment Preparation
+
+**Important**: Before deploying to any cloud platform, you need to fork the project to your GitHub account first.
+
+1. Visit https://github.com/topcheer/cligool
+2. Click the **"Fork"** button in the top right corner
+3. Now you have your own `cligool` repository
+
+Then, when deploying, select your forked repository (not `topcheer/cligool`).
+
 #### Platform Comparison
 
 | Platform | Free Tier | Difficulty | Cold Start | Recommendation |
@@ -163,7 +173,7 @@ Don't want to maintain your own server? Deploy to free cloud platforms with one 
 open https://dashboard.render.com/blueprints/new
 
 # 2. Connect your GitHub account
-# 3. Select topcheer/cligool repository
+# 3. Select your forked cligool repository
 # 4. Click "Apply Blueprint"
 # 5. Wait 3-5 minutes, get deployment URL
 ```
@@ -172,14 +182,15 @@ open https://dashboard.render.com/blueprints/new
 
 #### Railway Deployment
 
-```bash
-# 1. Visit Railway
-open https://railway.app
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com?referralCode=V6e2VV)
 
-# 2. Click "Deploy from GitHub"
-# 3. Select topcheer/cligool repository
-# 4. Railway auto-detects railway.toml configuration
-# 5. Deployment complete, get URL
+*New users get $20 free credits*
+
+```bash
+# 1. Click the button above to visit Railway
+# 2. Connect your GitHub account
+# 3. Select your forked cligool repository
+# 4. Wait for automatic deployment to complete
 ```
 
 #### Koyeb Deployment

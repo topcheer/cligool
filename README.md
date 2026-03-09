@@ -190,6 +190,16 @@ CliGool 支持配置文件来设置常用参数：
 
 不想自己维护服务器？可以使用免费云平台一键部署！
 
+#### 部署前准备
+
+**重要**：在部署到任何云平台之前，需要先将项目 Fork 到你的 GitHub 账号。
+
+1. 访问 https://github.com/topcheer/cligool
+2. 点击右上角 **"Fork"** 按钮
+3. 现在你有了自己的 `cligool` 仓库
+
+然后在部署时选择你 Fork 的仓库（不是 `topcheer/cligool`）。
+
 #### 平台对比
 
 | 平台 | 免费额度 | 部署难度 | 冷启动 | 推荐指数 |
@@ -206,7 +216,7 @@ CliGool 支持配置文件来设置常用参数：
 open https://dashboard.render.com/blueprints/new
 
 # 2. 连接你的 GitHub 账号
-# 3. 选择 topcheer/cligool 仓库
+# 3. 选择你 Fork 的 cligool 仓库
 # 4. 点击 "Apply Blueprint"
 # 5. 等待 3-5 分钟，获得部署 URL
 ```
@@ -222,7 +232,7 @@ open https://dashboard.render.com/blueprints/new
 ```bash
 # 1. 点击上方按钮访问 Railway
 # 2. 连接 GitHub 账号
-# 3. 选择 topcheer/cligool 仓库
+# 3. 选择你 Fork 的 cligool 仓库
 # 4. 等待自动部署完成
 ```
 
