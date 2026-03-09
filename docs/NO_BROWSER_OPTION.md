@@ -22,7 +22,7 @@ cligool-windows-amd64.exe -server http://localhost:8081 -no-browser
 
 ```json
 {
-  "server": "https://cligool.zty8.cn",
+  "server": "https://cligool.ystone.us",
   "proxy": "",
   "cols": 0,
   "rows": 0,

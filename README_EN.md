@@ -4,11 +4,11 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Platforms](https://img.shields.io/badge/platforms-30-blue)](#-supported-platforms)
 [![Docker](https://img.shields.io/badge/docker-multi--arch-blue.svg)](https://ghcr.io/topcheer/cligool)
-[![Demo](https://img.shields.io/badge/demo-online-success.svg)](https://cligool.zty8.cn/)
+[![Demo](https://img.shields.io/badge/demo-online-success.svg)](https://cligool.ystone.us/)
 
 A cross-platform remote terminal solution based on Go and WebSocket, supporting 30 operating systems and architectures.
 
-**[🚀 Live Demo](https://cligool.zty8.cn/)** | **[📥 Download Clients](https://cligool.zty8.cn/)**
+**[🚀 Live Demo](https://cligool.ystone.us/)** | **[📥 Download Clients](https://cligool.ystone.us/)**
 
 ## ✨ Key Features
 
@@ -79,7 +79,7 @@ Don't want to deploy locally? Try the online demo first!
 
 ### Access Online Demo
 
-👉 **[https://cligool.zty8.cn/](https://cligool.zty8.cn/)**
+👉 **[https://cligool.ystone.us/](https://cligool.ystone.us/)**
 
 ### Demo Usage Steps
 
@@ -392,7 +392,7 @@ MIT License - see [LICENSE](LICENSE) file for details
 
 - GitHub: https://github.com/topcheer/cligool
 - Issues: https://github.com/topcheer/cligool/issues
-- Live Demo: https://cligool.zty8.cn
+- Live Demo: https://cligool.ystone.us
 
 ---
 

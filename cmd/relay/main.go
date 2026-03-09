@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -44,6 +45,24 @@ func main() {
 		c.HTML(http.StatusOK, "landing.html", gin.H{
 			"title": "CliGool - 跨平台远程终端",
 		})
+	})
+
+	// 根目录静态验证文件（如第三方站点验证 txt）
+	router.GET("/:filename", func(c *gin.Context) {
+		filename := c.Param("filename")
+		if filepath.Base(filename) != filename || filepath.Ext(filename) != ".txt" {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		filePath := filepath.Join("web", filename)
+		info, err := os.Stat(filePath)
+		if err != nil || info.IsDir() {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		c.File(filePath)
 	})
 
 	// 会话页面 - 直接通过URL访问

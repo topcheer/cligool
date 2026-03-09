@@ -3,11 +3,11 @@
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://golang.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Platforms](https://img.shields.io/badge/platforms-30-blue)](#-支持的平台)
-[![Demo](https://img.shields.io/badge/demo-online-success.svg)](https://cligool.zty8.cn/)
+[![Demo](https://img.shields.io/badge/demo-online-success.svg)](https://cligool.ystone.us/)
 
 一个基于Go和WebSocket的跨平台远程终端解决方案，支持30种操作系统和架构。
 
-**[🚀 在线体验](https://cligool.zty8.cn/)** | **[📥 下载客户端](https://cligool.zty8.cn/)**
+**[🚀 在线体验](https://cligool.ystone.us/)** | **[📥 下载客户端](https://cligool.ystone.us/)**
 
 ## ✨ 核心特性
 
@@ -73,7 +73,7 @@ CLI客户端            中继服务器              Web浏览器
 
 ### 访问在线Demo
 
-👉 **[https://cligool.zty8.cn/](https://cligool.zty8.cn/)**
+👉 **[https://cligool.ystone.us/](https://cligool.ystone.us/)**
 
 ### Demo使用步骤
 

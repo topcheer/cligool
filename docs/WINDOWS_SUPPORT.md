@@ -58,31 +58,31 @@ Windows (ConPTY):
 ### Windows
 ```cmd
 REM 启动默认客户端（cmd.exe）
-cligool-windows-amd64.exe -server https://cligool.zty8.cn
+cligool-windows-amd64.exe -server https://cligool.ystone.us
 
 REM 使用自定义会话ID
-cligool-windows-amd64.exe -server https://cligool.zty8.cn -session your-session-id
+cligool-windows-amd64.exe -server https://cligool.ystone.us -session your-session-id
 
 REM 运行AI CLI工具
-cligool-windows-amd64.exe -cmd claude -server https://cligool.zty8.cn
+cligool-windows-amd64.exe -cmd claude -server https://cligool.ystone.us
 
 REM 运行带参数的命令
-cligool-windows-amd64.exe -cmd git -args "status" -server https://cligool.zty8.cn
+cligool-windows-amd64.exe -cmd git -args "status" -server https://cligool.ystone.us
 
 REM 使用PowerShell
-cligool-windows-amd64.exe -cmd powershell.exe -server https://cligool.zty8.cn
+cligool-windows-amd64.exe -cmd powershell.exe -server https://cligool.ystone.us
 ```
 
 ### Linux/macOS
 ```bash
 # 启动客户端
-./cligool-darwin-arm64 -server https://cligool.zty8.cn
+./cligool-darwin-arm64 -server https://cligool.ystone.us
 
 # 使用自定义会话ID
-./cligool-darwin-arm64 -server https://cligool.zty8.cn -session your-session-id
+./cligool-darwin-arm64 -server https://cligool.ystone.us -session your-session-id
 
 # 运行AI CLI工具
-./cligool-darwin-arm64 -cmd claude -server https://cligool.zty8.cn
+./cligool-darwin-arm64 -cmd claude -server https://cligool.ystone.us
 ```
 
 ## 🎯 Windows ConPTY特性

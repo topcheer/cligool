@@ -323,7 +323,7 @@ func buildNoCliHintMessage(sessionID string) string {
 - 检查防火墙设置
 
 📥 下载客户端：
-- https://cligool.zty8.cn/`, fmt.Sprintf(cmdExample, sessionID), sessionID)
+- https://cligool.ystone.us/`, fmt.Sprintf(cmdExample, sessionID), sessionID)
 
 	return hint
 }

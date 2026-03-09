@@ -107,9 +107,9 @@ go run test_pty.go
 
 ```
 ✨ 自动生成会话ID: [UUID]
-🚀 连接到中继服务器: https://cligool.zty8.cn
+🚀 连接到中继服务器: https://cligool.ystone.us
 📋 会话ID: [UUID]
-🌐 Web访问地址: https://cligool.zty8.cn/?session=[UUID]
+🌐 Web访问地址: https://cligool.ystone.us/?session=[UUID]
 ✅ 终端会话已启动
 ```
 
@@ -131,7 +131,7 @@ go run test_pty.go
 即使本地PTY有问题，你仍然可以：
 
 1. **启动服务**: `docker-compose up -d`
-2. **访问Web界面**: https://cligool.zty8.cn
+2. **访问Web界面**: https://cligool.ystone.us
 3. **使用会话ID**: 任意UUID或自定义ID
 
 Web界面的终端功能不依赖本地PTY！

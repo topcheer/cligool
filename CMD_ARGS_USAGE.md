@@ -12,7 +12,7 @@ cligool [选项] -cmd <命令> -args <参数>
 
 - `-cmd <命令>`: 要执行的命令（如 `claude`, `gemini`, `git`, `npm` 等）
 - `-args <参数>`: 传递给命令的参数，用空格分隔多个参数
-- `-server <URL>`: 中继服务器地址（默认：https://cligool.zty8.cn）
+- `-server <URL>`: 中继服务器地址（默认：https://cligool.ystone.us）
 - `-session <ID>`: 会话ID（可选，默认自动生成）
 - `-cols <数字>`: 终端列数（0=自动检测）
 - `-rows <数字>`: 终端行数（0=自动检测）

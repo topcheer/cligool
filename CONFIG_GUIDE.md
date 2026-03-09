@@ -17,7 +17,7 @@ CliGool 会按以下优先级查找配置文件：
 
 ```json
 {
-  "server": "https://cligool.zty8.cn",
+  "server": "https://cligool.ystone.us",
   "cols": 120,
   "rows": 80
 }
@@ -27,7 +27,7 @@ CliGool 会按以下优先级查找配置文件：
 
 | 配置项 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
-| `server` | string | `https://cligool.zty8.cn` | 中继服务器URL |
+| `server` | string | `https://cligool.ystone.us` | 中继服务器URL |
 | `cols` | int | `0` | 终端列数（0=自动检测） |
 | `rows` | int | `0` | 终端行数（0=自动检测） |
 
@@ -37,7 +37,7 @@ CliGool 会按以下优先级查找配置文件：
 
 ```json
 {
-  "server": "https://cligool.zty8.cn",
+  "server": "https://cligool.ystone.us",
   "cols": 0,
   "rows": 0
 }
@@ -54,7 +54,7 @@ CliGool 会按以下优先级查找配置文件：
 **配置文件** (`~/.cligool.json`):
 ```json
 {
-  "server": "https://cligool.zty8.cn",
+  "server": "https://cligool.ystone.us",
   "cols": 120,
   "rows": 80
 }
@@ -64,7 +64,7 @@ CliGool 会按以下优先级查找配置文件：
 ```bash
 ./cligool-darwin-arm64
 ```
-**结果**：使用配置文件的值（server=https://cligool.zty8.cn, cols=120, rows=80）
+**结果**：使用配置文件的值（server=https://cligool.ystone.us, cols=120, rows=80）
 
 **命令**：
 ```bash
@@ -102,7 +102,7 @@ CliGool 会按以下优先级查找配置文件：
 **~/.cligool.json**:
 ```json
 {
-  "server": "https://cligool.zty8.cn",
+  "server": "https://cligool.ystone.us",
   "cols": 140,
   "rows": 40
 }
@@ -190,7 +190,7 @@ Windows 上的配置文件位置：
 
 ```powershell
 # 创建默认配置
-echo '{"server":"https://cligool.zty8.cn","cols":120,"rows":80}' | Out-File -FilePath $env:USERPROFILE\.cligool.json -Encoding utf8
+echo '{"server":"https://cligool.ystone.us","cols":120,"rows":80}' | Out-File -FilePath $env:USERPROFILE\.cligool.json -Encoding utf8
 ```
 
 ## 故障排除
@@ -207,7 +207,7 @@ echo '{"server":"https://cligool.zty8.cn","cols":120,"rows":80}' | Out-File -Fil
 **错误示例**：
 ```json
 {
-  "server": "https://cligool.zty8.cn",
+  "server": "https://cligool.ystone.us",
   "cols": 120,
   "rows": 80,
 }
@@ -218,7 +218,7 @@ echo '{"server":"https://cligool.zty8.cn","cols":120,"rows":80}' | Out-File -Fil
 **正确格式**：
 ```json
 {
-  "server": "https://cligool.zty8.cn",
+  "server": "https://cligool.ystone.us",
   "cols": 120,
   "rows": 80
 }
@@ -235,7 +235,7 @@ ls -la ~ | grep .cligool.json
 
 # 手动创建
 touch ~/.cligool.json
-echo '{"server":"https://cligool.zty8.cn","cols":0,"rows":0}' > ~/.cligool.json
+echo '{"server":"https://cligool.ystone.us","cols":0,"rows":0}' > ~/.cligool.json
 ```
 
 ## 高级用法

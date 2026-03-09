@@ -144,7 +144,7 @@ function displayNoCliMessage(message) {
 - 检查防火墙设置
 
 📥 下载客户端：
-- https://cligool.zty8.cn/
+- https://cligool.ystone.us/
 
 ─────────────────────────────────────────────────────────────
 

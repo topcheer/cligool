@@ -22,7 +22,7 @@ go build -o cligool.exe ./cmd/client
 
 ### 1. 启动客户端
 ```cmd
-cligool.exe -server https://cligool.zty8.cn
+cligool.exe -server https://cligool.ystone.us
 ```
 
 ### 2. 查看输出
@@ -32,7 +32,7 @@ cligool.exe -server https://cligool.zty8.cn
 ║                    🚀 CliGool 远程终端                      ║
 ╠═══════════════════════════════════════════════════════════╣
 ║ 📋 会话ID: your-uuid-here                                ║
-║ 🌐 Web访问: https://cligool.zty8.cn/session/your-uuid    ║
+║ 🌐 Web访问: https://cligool.ystone.us/session/your-uuid    ║
 ║ 🔗 连接状态: 🟡 连接中...                                   ║
 ╚═══════════════════════════════════════════════════════════╝
 
@@ -53,7 +53,7 @@ cligool.exe -server https://your-server.com
 
 ### 使用自定义会话ID
 ```cmd
-cligool.exe -server https://cligool.zty8.cn -session my-custom-session-id
+cligool.exe -server https://cligool.ystone.us -session my-custom-session-id
 ```
 
 ## ⚠️ Windows 限制和注意事项
@@ -81,13 +81,13 @@ cligool.exe -server https://cligool.zty8.cn -session my-custom-session-id
 # 在WSL中使用Linux版本的CliGool
 wsl
 cd /path/to/cligool
-./cligool -server https://cligool.zty8.cn
+./cligool -server https://cligool.ystone.us
 ```
 
 #### 使用 Git Bash
 ```bash
 # 在Git Bash中使用
-./cligool.exe -server https://cligool.zty8.cn
+./cligool.exe -server https://cligool.ystone.us
 ```
 
 ## 📊 功能对比
@@ -108,14 +108,14 @@ cd /path/to/cligool
 **解决方案**:
 ```cmd
 chcp 65001
-cligool.exe -server https://cligool.zty8.cn
+cligool.exe -server https://cligool.ystone.us
 ```
 
 ### 问题2: 某些命令不工作
 **解决方案**: 使用 PowerShell 或 WSL
 ```cmd
 # 使用PowerShell
-powershell.exe -Command "& { ./cligool.exe -server https://cligool.zty8.cn }"
+powershell.exe -Command "& { ./cligool.exe -server https://cligool.ystone.us }"
 ```
 
 ### 问题3: 编译失败

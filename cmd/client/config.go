@@ -29,7 +29,7 @@ type Config struct {
 // DefaultConfig 返回默认配置
 func DefaultConfig() Config {
 	return Config{
-		Server:    "https://cligool.zty8.cn",
+		Server:    "https://cligool.ystone.us",
 		Proxy:     "", // 空表示不使用代理
 		Cols:      0,  // 0 表示自动检测
 		Rows:      0,  // 0 表示自动检测

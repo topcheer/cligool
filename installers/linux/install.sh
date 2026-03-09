@@ -133,7 +133,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
     echo "📝 创建默认配置文件：$CONFIG_FILE"
     cat > "$CONFIG_FILE" << EOF
 {
-  "server": "https://cligool.zty8.cn",
+  "server": "https://cligool.ystone.us",
   "cols": 0,
   "rows": 0
 }

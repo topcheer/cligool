@@ -44,7 +44,7 @@ ls -lh bin/ | grep cligool | awk '{print "  " $9, "-", $5}'
 
 echo ""
 echo "💡 使用方法:"
-echo "  Windows:   bin/cligool-windows-amd64.exe -server https://cligool.zty8.cn"
-echo "  Linux:     ./bin/cligool-linux-amd64 -server https://cligool.zty8.cn"
-echo "  macOS x64: ./bin/cligool-darwin-amd64 -server https://cligool.zty8.cn"
-echo "  macOS ARM: ./bin/cligool-darwin-arm64 -server https://cligool.zty8.cn"
+echo "  Windows:   bin/cligool-windows-amd64.exe -server https://cligool.ystone.us"
+echo "  Linux:     ./bin/cligool-linux-amd64 -server https://cligool.ystone.us"
+echo "  macOS x64: ./bin/cligool-darwin-amd64 -server https://cligool.ystone.us"
+echo "  macOS ARM: ./bin/cligool-darwin-arm64 -server https://cligool.ystone.us"
