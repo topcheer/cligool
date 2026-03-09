@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 package main
@@ -27,15 +28,15 @@ import (
 )
 
 type TerminalMessage struct {
-	Type        string `json:"type"`
-	Data        string `json:"data"`
-	Session     string `json:"session"`
-	UserID      string `json:"user_id"`
-	Source      string `json:"source,omitempty"` // "local" or "web"
-	WorkingDir  string `json:"working_dir,omitempty"`
-	OSInfo      string `json:"os_info,omitempty"`
-	Rows        int    `json:"rows,omitempty"`    // 终端行数
-	Cols        int    `json:"cols,omitempty"`    // 终端列数
+	Type       string `json:"type"`
+	Data       string `json:"data"`
+	Session    string `json:"session"`
+	UserID     string `json:"user_id"`
+	Source     string `json:"source,omitempty"` // "local" or "web"
+	WorkingDir string `json:"working_dir,omitempty"`
+	OSInfo     string `json:"os_info,omitempty"`
+	Rows       int    `json:"rows,omitempty"` // 终端行数
+	Cols       int    `json:"cols,omitempty"` // 终端列数
 }
 
 func main() {
@@ -154,12 +155,16 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 		return fmt.Errorf("WebSocket连接失败: %w", err)
 	}
 
+	wsWriter := newWebsocketWriter(conn)
+
 	// 确保在退出时总是通知 relay 服务器
 	var sessionError error
 	defer func() {
+		wsWriter.StopHeartbeat()
+
 		// 发送关闭消息
 		closeMsg := TerminalMessage{
-			Type:   "close",
+			Type:    "close",
 			Session: sessionID,
 			UserID:  "client",
 		}
@@ -173,12 +178,11 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 		}
 
 		jsonData, _ := json.Marshal(closeMsg)
-		if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
+		if err := wsWriter.WriteWithTimeout(jsonData, 2*time.Second); shouldLogWebSocketError(err) {
 			log.Printf("❌ 发送关闭消息失败: %v", err)
 		}
 
-		// 关闭 WebSocket 连接
-		conn.Close()
+		wsWriter.Shutdown()
 	}()
 
 	log.Println("✅ WebSocket已连接")
@@ -196,36 +200,25 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 	}
 	fmt.Println()
 
-	// 创建WebSocket写入channel，确保串行写入
-	wsWriteChan := make(chan []byte, 100)
-
-	// 启动WebSocket写入goroutine
-	go func() {
-		for data := range wsWriteChan {
-			if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
-				log.Printf("❌ WebSocket写入失败: %v", err)
-				return
-			}
-		}
-	}()
-
-	// 设置心跳机制
-	// 注意：心跳是控制帧，直接发送，不通过channel
-	setupHeartbeat(conn)
+	// 创建串行化 WebSocket 写入器，避免并发写入
+	wsWriter.StartHeartbeat()
 
 	// 发送初始化消息（工作目录和系统信息）
 	wd, _ := os.Getwd()
 	initMsg := TerminalMessage{
-		Type:        "init",
-		Session:     sessionID,
-		UserID:      "client",
-		WorkingDir:  wd,
-		OSInfo:      "unix",
-		Rows:        rows,
-		Cols:        cols,
+		Type:       "init",
+		Session:    sessionID,
+		UserID:     "client",
+		WorkingDir: wd,
+		OSInfo:     "unix",
+		Rows:       rows,
+		Cols:       cols,
 	}
 	jsonData, _ := json.Marshal(initMsg)
-	wsWriteChan <- jsonData
+	if err := wsWriter.Write(jsonData); err != nil {
+		sessionError = fmt.Errorf("发送初始化消息失败: %w", err)
+		return sessionError
+	}
 	log.Printf("✅ 已发送初始化消息: 工作目录=%s, 大小=%dx%d", wd, cols, rows)
 
 	// 创建 PTY
@@ -268,8 +261,8 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 	// 设置环境变量以确保终端工具正确工作
 	env := append(os.Environ(),
 		"TERM=xterm-256color",
-		"COLORTERM=truecolor",  // 启用真色支持
-		"FORCE_COLOR=1",         // 强制启用颜色
+		"COLORTERM=truecolor", // 启用真色支持
+		"FORCE_COLOR=1",       // 强制启用颜色
 	)
 
 	// 确保 LANG/LC_ALL 设置为 UTF-8
@@ -322,14 +315,16 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 
 			// 发送新的终端大小到 WebSocket 服务器
 			resizeMsg := TerminalMessage{
-				Type:   "resize",
-				Rows:   int(size.Rows),
-				Cols:   int(size.Cols),
+				Type:    "resize",
+				Rows:    int(size.Rows),
+				Cols:    int(size.Cols),
 				Session: sessionID,
-				UserID: "client",
+				UserID:  "client",
 			}
 			jsonData, _ := json.Marshal(resizeMsg)
-			wsWriteChan <- jsonData
+			if err := wsWriter.Write(jsonData); shouldLogWebSocketError(err) {
+				log.Printf("❌ 发送终端大小失败: %v", err)
+			}
 		}
 	}
 
@@ -380,7 +375,9 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 				Source:  "local",
 			}
 			jsonData, _ := json.Marshal(msg)
-			wsWriteChan <- jsonData
+			if err := wsWriter.Write(jsonData); shouldLogWebSocketError(err) {
+				log.Printf("❌ 发送本地输入失败: %v", err)
+			}
 		}
 	}()
 
@@ -390,7 +387,9 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 		for {
 			_, message, err := conn.ReadMessage()
 			if err != nil {
-				log.Printf("WebSocket读取失败: %v", err)
+				if shouldLogWebSocketError(err) {
+					log.Printf("WebSocket读取失败: %v", err)
+				}
 				return
 			}
 
@@ -445,7 +444,9 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 			}
 
 			jsonData, _ := json.Marshal(msg)
-			wsWriteChan <- jsonData
+			if err := wsWriter.Write(jsonData); shouldLogWebSocketError(err) {
+				log.Printf("❌ 发送终端输出失败: %v", err)
+			}
 		}
 
 		// 发送查询响应到 PTY
@@ -469,38 +470,6 @@ func buildWebSocketURL(serverURL, sessionID string) (string, error) {
 	wsURL := fmt.Sprintf("%s://%s/api/terminal/%s?type=client&user_id=client",
 		scheme, parsedURL.Host, sessionID)
 	return wsURL, nil
-}
-
-// setupHeartbeat 设置心跳机制
-func setupHeartbeat(conn *websocket.Conn) {
-	// 设置ping handler，自动回复pong
-	conn.SetPingHandler(func(appData string) error {
-		// log.Printf("💓 收到服务器ping")
-		return conn.WriteMessage(websocket.PongMessage, []byte(appData))
-	})
-
-	// 设置pong handler
-	conn.SetPongHandler(func(appData string) error {
-		// log.Printf("💓 收到服务器pong")
-		return nil
-	})
-
-	// 定期发送ping
-	go func() {
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ticker.C:
-				if err := conn.WriteMessage(websocket.PingMessage, []byte("heartbeat")); err != nil {
-					log.Printf("❌ 发送ping失败: %v", err)
-					return
-				}
-				// log.Printf("💓 发送ping到服务器")
-			}
-		}
-	}()
 }
 
 // createProxyDialer 创建代理拨号器

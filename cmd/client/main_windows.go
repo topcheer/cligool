@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package main
@@ -36,15 +37,15 @@ import (
 )
 
 type TerminalMessage struct {
-	Type        string `json:"type"`
-	Data        string `json:"data"`
-	Session     string `json:"session"`
-	UserID      string `json:"user_id"`
-	Source      string `json:"source,omitempty"` // "local" or "web"
-	WorkingDir  string `json:"working_dir,omitempty"`
-	OSInfo      string `json:"os_info,omitempty"`
-	Rows        int    `json:"rows,omitempty"`    // 终端行数
-	Cols        int    `json:"cols,omitempty"`    // 终端列数
+	Type       string `json:"type"`
+	Data       string `json:"data"`
+	Session    string `json:"session"`
+	UserID     string `json:"user_id"`
+	Source     string `json:"source,omitempty"` // "local" or "web"
+	WorkingDir string `json:"working_dir,omitempty"`
+	OSInfo     string `json:"os_info,omitempty"`
+	Rows       int    `json:"rows,omitempty"` // 终端行数
+	Cols       int    `json:"cols,omitempty"` // 终端列数
 }
 
 // 全局编码转换器
@@ -67,11 +68,11 @@ const (
 	ENABLE_VIRTUAL_TERMINAL_INPUT = 0x0200
 
 	// 输入记录类型
-	KEY_EVENT                 = 0x0001
-	MOUSE_EVENT               = 0x0002
-	WINDOW_BUFFER_SIZE_EVENT  = 0x0004
-	MENU_EVENT                = 0x0008
-	FOCUS_EVENT               = 0x0010
+	KEY_EVENT                = 0x0001
+	MOUSE_EVENT              = 0x0002
+	WINDOW_BUFFER_SIZE_EVENT = 0x0004
+	MENU_EVENT               = 0x0008
+	FOCUS_EVENT              = 0x0010
 
 	// 标准句柄常量
 	STD_INPUT_HANDLE  = uintptr(0xFFFFFFF6) - 10
@@ -80,18 +81,18 @@ const (
 
 // Windows API 函数
 var (
-	modkernel32                 = windows.NewLazySystemDLL("kernel32.dll")
-	procCreatePseudoConsole     = modkernel32.NewProc("CreatePseudoConsole")
-	procResizePseudoConsole     = modkernel32.NewProc("ResizePseudoConsole")
-	procClosePseudoConsole      = modkernel32.NewProc("ClosePseudoConsole")
+	modkernel32                           = windows.NewLazySystemDLL("kernel32.dll")
+	procCreatePseudoConsole               = modkernel32.NewProc("CreatePseudoConsole")
+	procResizePseudoConsole               = modkernel32.NewProc("ResizePseudoConsole")
+	procClosePseudoConsole                = modkernel32.NewProc("ClosePseudoConsole")
 	procInitializeProcThreadAttributeList = modkernel32.NewProc("InitializeProcThreadAttributeList")
-	procUpdateProcThreadAttribute          = modkernel32.NewProc("UpdateProcThreadAttribute")
+	procUpdateProcThreadAttribute         = modkernel32.NewProc("UpdateProcThreadAttribute")
 	procDeleteProcThreadAttributeList     = modkernel32.NewProc("DeleteProcThreadAttributeList")
-	procGetStdHandle            = modkernel32.NewProc("GetStdHandle")
-	procGetConsoleMode          = modkernel32.NewProc("GetConsoleMode")
-	procSetConsoleMode          = modkernel32.NewProc("SetConsoleMode")
-	procReadConsoleInput        = modkernel32.NewProc("ReadConsoleInputW")
-	procGetConsoleScreenBufferInfo = modkernel32.NewProc("GetConsoleScreenBufferInfo")
+	procGetStdHandle                      = modkernel32.NewProc("GetStdHandle")
+	procGetConsoleMode                    = modkernel32.NewProc("GetConsoleMode")
+	procSetConsoleMode                    = modkernel32.NewProc("SetConsoleMode")
+	procReadConsoleInput                  = modkernel32.NewProc("ReadConsoleInputW")
+	procGetConsoleScreenBufferInfo        = modkernel32.NewProc("GetConsoleScreenBufferInfo")
 )
 
 // _CONSOLE_SCREEN_BUFFER_INFO Windows控制台屏幕缓冲区信息
@@ -134,11 +135,11 @@ type _HPCON windows.Handle
 
 // pseudoConsole Windows伪终端
 type pseudoConsole struct {
-	handle     _HPCON
-	cmdIn      windows.Handle
-	cmdOut     windows.Handle
-	ptyIn      windows.Handle
-	ptyOut     windows.Handle
+	handle _HPCON
+	cmdIn  windows.Handle
+	cmdOut windows.Handle
+	ptyIn  windows.Handle
+	ptyOut windows.Handle
 }
 
 // newPseudoConsole 创建一个新的伪控制台
@@ -166,10 +167,10 @@ func newPseudoConsole(width, height int16) (*pseudoConsole, error) {
 	// 调用CreatePseudoConsole
 	// 注意：第一个参数是打包后的COORD值，不是指针
 	hr, _, _ := procCreatePseudoConsole.Call(
-		coord.Pack(),    // size (packed COORD)
+		coord.Pack(),       // size (packed COORD)
 		uintptr(pc.ptyIn),  // hInput
 		uintptr(pc.ptyOut), // hOutput
-		0,                // dwFlags
+		0,                  // dwFlags
 		uintptr(unsafe.Pointer(&pc.handle)),
 	)
 
@@ -560,12 +561,16 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 		return fmt.Errorf("WebSocket连接失败: %w", err)
 	}
 
+	wsWriter := newWebsocketWriter(conn)
+
 	// 确保在退出时总是通知 relay 服务器
 	var sessionError error
 	defer func() {
+		wsWriter.StopHeartbeat()
+
 		// 发送关闭消息
 		closeMsg := TerminalMessage{
-			Type:   "close",
+			Type:    "close",
 			Session: sessionID,
 			UserID:  "client",
 		}
@@ -579,12 +584,11 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 		}
 
 		jsonData, _ := json.Marshal(closeMsg)
-		if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
+		if err := wsWriter.WriteWithTimeout(jsonData, 2*time.Second); shouldLogWebSocketError(err) {
 			log.Printf("❌ 发送关闭消息失败: %v", err)
 		}
 
-		// 关闭 WebSocket 连接
-		conn.Close()
+		wsWriter.Shutdown()
 	}()
 
 	log.Println("WebSocket已连接")
@@ -623,36 +627,25 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 	}
 	fmt.Println()
 
-	// 创建WebSocket写入channel，确保串行写入
-	wsWriteChan := make(chan []byte, 100)
-
-	// 启动WebSocket写入goroutine
-	go func() {
-		for data := range wsWriteChan {
-			if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
-				log.Printf("WebSocket写入失败: %v", err)
-				return
-			}
-		}
-	}()
-
-	// 设置ping handler和心跳
-	// 注意：心跳是控制帧，直接发送，不通过channel
-	setupHeartbeat(conn)
+	// 创建串行化 WebSocket 写入器，避免并发写入
+	wsWriter.StartHeartbeat()
 
 	// 发送初始化消息（工作目录和系统信息）
 	wd, _ := os.Getwd()
 	initMsg := TerminalMessage{
-		Type:        "init",
-		Session:     sessionID,
-		UserID:      "client",
-		WorkingDir:  wd,
-		OSInfo:      "windows",
-		Rows:        rows,
-		Cols:        cols,
+		Type:       "init",
+		Session:    sessionID,
+		UserID:     "client",
+		WorkingDir: wd,
+		OSInfo:     "windows",
+		Rows:       rows,
+		Cols:       cols,
 	}
 	jsonData, _ := json.Marshal(initMsg)
-	wsWriteChan <- jsonData
+	if err := wsWriter.Write(jsonData); err != nil {
+		sessionError = fmt.Errorf("发送初始化消息失败: %w", err)
+		return sessionError
+	}
 	log.Printf("已发送初始化消息: 工作目录=%s, 大小=%dx%d", wd, cols, rows)
 
 	// 创建ConPTY
@@ -771,8 +764,8 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 		nil,
 		false, // 不继承句柄
 		windows.EXTENDED_STARTUPINFO_PRESENT,
-		nil,   // 使用父进程环境
-		nil,   // 使用当前目录
+		nil, // 使用父进程环境
+		nil, // 使用当前目录
 		&si.StartupInfo,
 		&pi,
 	)
@@ -830,7 +823,9 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 				Source:  "local",
 			}
 			jsonData, _ := json.Marshal(msg)
-			wsWriteChan <- jsonData
+			if err := wsWriter.Write(jsonData); shouldLogWebSocketError(err) {
+				log.Printf("发送本地输入失败: %v", err)
+			}
 		}
 	}()
 
@@ -887,7 +882,9 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 		}
 
 		jsonData, _ := json.Marshal(msg)
-		wsWriteChan <- jsonData
+		if err := wsWriter.Write(jsonData); shouldLogWebSocketError(err) {
+			log.Printf("发送终端输出失败: %v", err)
+		}
 	}
 }
 
@@ -964,37 +961,6 @@ func buildWebSocketURL(serverURL, sessionID string) (string, error) {
 	wsURL := fmt.Sprintf("%s://%s/api/terminal/%s?type=client&user_id=client",
 		scheme, parsedURL.Host, sessionID)
 	return wsURL, nil
-}
-
-// setupHeartbeat 设置心跳机制
-func setupHeartbeat(conn *websocket.Conn) {
-	// 设置ping handler，自动回复pong
-	conn.SetPingHandler(func(appData string) error {
-		// log.Printf("💓 收到服务器ping")
-		return conn.WriteMessage(websocket.PongMessage, []byte(appData))
-	})
-
-	// 设置pong handler
-	conn.SetPongHandler(func(appData string) error {
-		// log.Printf("💓 收到服务器pong")
-		return nil
-	})
-
-	// 定期发送ping
-	go func() {
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ticker.C:
-				if err := conn.WriteMessage(websocket.PingMessage, []byte("heartbeat")); err != nil {
-					log.Printf("发送ping失败: %v", err)
-					return
-				}
-			}
-		}
-	}()
 }
 
 // createProxyDialer 创建代理拨号器
