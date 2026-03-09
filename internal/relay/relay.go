@@ -23,12 +23,12 @@ var upgrader = websocket.Upgrader{
 
 // TerminalMessage 终端消息类型
 type TerminalMessage struct {
-	Type       string `json:"type"`       // "input", "output", "resize", "close", "init"
-	Data       string `json:"data"`       // 终端数据
-	Rows       int    `json:"rows"`       // 终端行数
-	Cols       int    `json:"cols"`       // 终端列数
-	Session    string `json:"session"`    // 会话ID
-	UserID     string `json:"user_id"`    // 用户ID
+	Type       string `json:"type"`                  // "input", "output", "resize", "close", "init"
+	Data       string `json:"data"`                  // 终端数据
+	Rows       int    `json:"rows"`                  // 终端行数
+	Cols       int    `json:"cols"`                  // 终端列数
+	Session    string `json:"session"`               // 会话ID
+	UserID     string `json:"user_id"`               // 用户ID
 	WorkingDir string `json:"working_dir,omitempty"` // 工作目录
 	OSInfo     string `json:"os_info,omitempty"`     // 操作系统信息
 }
@@ -51,12 +51,12 @@ type Session struct {
 	ClientCon        *websocket.Conn            // CLI客户端连接
 	Mutex            sync.RWMutex
 	Active           bool
-	LastPing         time.Time // 最后一次收到ping的时间
-	WorkingDirectory string   // 客户端当前工作目录
-	OSInfo           string   // 客户端操作系统信息
+	LastPing         time.Time       // 最后一次收到ping的时间
+	WorkingDirectory string          // 客户端当前工作目录
+	OSInfo           string          // 客户端操作系统信息
 	MessageCache     []CachedMessage // CLI消息缓存（当无Web客户端时）
-	CacheSizeLimit   int            // 缓存大小限制（条数）
-	TotalCacheSize   int            // 缓存总大小（字节）
+	CacheSizeLimit   int             // 缓存大小限制（条数）
+	TotalCacheSize   int             // 缓存总大小（字节）
 }
 
 // Service 中继服务
@@ -224,10 +224,10 @@ func (s *Service) sendCachedMessages(session *Session, conn *websocket.Conn) {
 
 	for i, cachedMsg := range cache {
 		msg := TerminalMessage{
-			Type:   cachedMsg.Type,
-			Data:   cachedMsg.Data,
-			Rows:   cachedMsg.Rows,
-			Cols:   cachedMsg.Cols,
+			Type:    cachedMsg.Type,
+			Data:    cachedMsg.Data,
+			Rows:    cachedMsg.Rows,
+			Cols:    cachedMsg.Cols,
 			Session: session.ID,
 		}
 
@@ -238,15 +238,30 @@ func (s *Service) sendCachedMessages(session *Session, conn *websocket.Conn) {
 		}
 	}
 
-	log.Printf("✅ 缓存消息发送完成: %d 条", len(cache))
+	s.clearCachedMessages(session)
+	log.Printf("✅ 缓存消息发送完成并已清空: %d 条", len(cache))
+}
+
+// clearCachedMessages 清空已经成功回放给Web客户端的缓存消息
+func (s *Service) clearCachedMessages(session *Session) {
+	session.Mutex.Lock()
+	defer session.Mutex.Unlock()
+
+	if len(session.MessageCache) == 0 {
+		session.TotalCacheSize = 0
+		return
+	}
+
+	session.MessageCache = session.MessageCache[:0]
+	session.TotalCacheSize = 0
 }
 
 // sendNoCliClientMessage 发送无CLI客户端的提示消息
 func (s *Service) sendNoCliClientMessage(session *Session, conn *websocket.Conn) {
 	// 构建提示消息，包含命令示例
 	hintMsg := TerminalMessage{
-		Type:   "no_cli",
-		Data:   buildNoCliHintMessage(session.ID),
+		Type:    "no_cli",
+		Data:    buildNoCliHintMessage(session.ID),
 		Session: session.ID,
 	}
 
@@ -328,8 +343,8 @@ func (s *Service) notifyWebClientsClientDisconnected(session *Session) {
 
 	// 创建关闭消息
 	closeMsg := TerminalMessage{
-		Type:   "close",
-		Data:   "CLI客户端已断开连接",
+		Type:    "close",
+		Data:    "CLI客户端已断开连接",
 		Session: session.ID,
 	}
 	jsonData, _ := json.Marshal(closeMsg)
@@ -480,7 +495,7 @@ func (s *Service) getOrCreateSession(sessionID, owner string) *Session {
 		Clients:        make(map[string]*websocket.Conn),
 		Active:         false,
 		MessageCache:   make([]CachedMessage, 0, 1000), // 预分配1000条容量
-		CacheSizeLimit: 1000,                            // 最多缓存1000条消息
+		CacheSizeLimit: 1000,                           // 最多缓存1000条消息
 	}
 
 	s.Sessions[sessionID] = session

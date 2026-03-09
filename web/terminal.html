@@ -3,529 +3,1807 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="CliGool Web Terminal - 自动恢复、状态可见的浏览器终端体验。">
     <title>CliGool - 远程终端</title>
     <style>
+        :root {
+            --surface: rgba(12, 23, 41, 0.82);
+            --line: rgba(148, 163, 184, 0.16);
+            --line-strong: rgba(56, 189, 248, 0.32);
+            --text: #e8f1ff;
+            --muted: #8fa4c3;
+            --muted-strong: #d0dced;
+            --primary: #38bdf8;
+            --success: #34d399;
+            --warning: #fbbf24;
+            --danger: #fb7185;
+            --shadow: 0 32px 90px rgba(2, 9, 18, 0.36);
+        }
+
         * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #1e1e1e;
-            color: #d4d4d4;
-            height: 100vh;
+            min-height: 100vh;
             overflow: hidden;
-            display: flex;
-            flex-direction: column;
+            font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top, rgba(56, 189, 248, 0.18), transparent 28%),
+                radial-gradient(circle at 88% 18%, rgba(249, 115, 22, 0.16), transparent 20%),
+                linear-gradient(180deg, #050b14 0%, #07111f 48%, #050912 100%);
         }
 
-        .header {
-            background: #2d2d2d;
-            padding: 15px 20px;
-            border-bottom: 1px solid #3e3e3e;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            opacity: 0.18;
+            pointer-events: none;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+            background-size: 64px 64px;
+            mask-image: linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 76%);
         }
 
-        .logo {
-            font-size: 24px;
-            font-weight: bold;
-            color: #4ec9b0;
-        }
-
-        .controls {
-            display: flex;
-            gap: 10px;
-            align-items: center;
+        a {
+            color: inherit;
+            text-decoration: none;
         }
 
         button {
-            background: #4ec9b0;
-            color: #1e1e1e;
             border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
+            background: none;
+            color: inherit;
             cursor: pointer;
-            font-weight: 600;
-            transition: all 0.2s;
+            font: inherit;
         }
 
-        button:hover {
-            background: #3db8a0;
+        code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
         }
 
-        .disconnect-btn {
-            background: #f48771;
-            color: #1e1e1e;
+        :focus-visible {
+            outline: 3px solid rgba(56, 189, 248, 0.66);
+            outline-offset: 3px;
         }
 
-        .disconnect-btn:hover {
-            background: #e37660;
+        .app-shell {
+            position: relative;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding: 18px;
         }
 
-        .status {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 600;
+        .app-shell.live-terminal {
+            gap: 0;
+            padding: 0;
         }
 
-        .status.disconnected {
-            background: #f48771;
-            color: #1e1e1e;
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 16px 18px;
+            border: 1px solid var(--line);
+            border-radius: 26px;
+            background: rgba(7, 17, 31, 0.72);
+            box-shadow: 0 18px 60px rgba(2, 10, 18, 0.32);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
         }
 
-        .status.connecting {
-            background: #dcdcaa;
-            color: #1e1e1e;
+        .brand {
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            gap: 14px;
         }
 
-        .status.connected {
-            background: #4ec9b0;
-            color: #1e1e1e;
+        .brand-mark {
+            width: 46px;
+            height: 46px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            display: grid;
+            place-items: center;
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.26), rgba(249, 115, 22, 0.18));
         }
 
-        .session-info {
-            color: #8a8a8a;
-            font-size: 12px;
+        .brand-mark svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .brand-copy strong {
+            display: block;
+            font-size: 1rem;
+        }
+
+        .brand-copy span {
+            display: block;
+            color: var(--muted);
+            font-size: 0.88rem;
+        }
+
+        .action-group {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .action-button {
+            border: 1px solid transparent;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 11px 16px;
+            font-weight: 700;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .action-button:hover {
+            transform: translateY(-1px);
+        }
+
+        .action-button.secondary {
+            border-color: var(--line);
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .action-button.secondary:hover {
+            border-color: var(--line-strong);
+        }
+
+        .action-button.danger {
+            border-color: rgba(251, 113, 133, 0.24);
+            color: #ffe5ea;
+            background: rgba(251, 113, 133, 0.12);
+        }
+
+        .action-button.link {
+            border-color: var(--line);
+            color: var(--muted-strong);
+            background: transparent;
+        }
+
+        .action-button.hidden {
+            display: none;
+        }
+
+        .workspace {
+            flex: 1;
+            min-height: 0;
+            display: grid;
+            grid-template-rows: auto 1fr;
+            gap: 16px;
+        }
+
+        .app-shell.live-terminal .topbar,
+        .app-shell.live-terminal .meta-grid,
+        .app-shell.live-terminal .terminal-toolbar,
+        .app-shell.live-terminal .connection-banner {
+            display: none;
+        }
+
+        .app-shell.live-terminal .workspace {
+            display: block;
+            height: 100vh;
+        }
+
+        .app-shell.live-terminal .terminal-shell {
+            height: 100vh;
+            border: none;
+            border-radius: 0;
+            background: #07111f;
+            box-shadow: none;
+        }
+
+        .app-shell.live-terminal .terminal-container {
+            height: 100%;
+            padding: 0;
+        }
+
+        .app-shell.live-terminal #terminal {
+            height: 100%;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .meta-card {
+            padding: 22px;
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            background: var(--surface);
+            box-shadow: 0 18px 50px rgba(2, 10, 18, 0.24);
+        }
+
+        .meta-label {
+            color: var(--muted);
+            font-size: 0.76rem;
+            font-weight: 700;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+        }
+
+        .status-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .status-chip {
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            color: var(--muted-strong);
+            font-weight: 700;
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .status-chip::before {
+            content: "";
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--warning);
+        }
+
+        .status-chip.connecting,
+        .status-chip.reconnecting,
+        .status-chip.waiting-cli,
+        .status-chip.offline {
+            border-color: rgba(245, 158, 11, 0.24);
+            color: #fde68a;
+            background: rgba(245, 158, 11, 0.12);
+        }
+
+        .status-chip.connecting::before,
+        .status-chip.reconnecting::before,
+        .status-chip.waiting-cli::before,
+        .status-chip.offline::before {
+            background: var(--warning);
+        }
+
+        .status-chip.connected {
+            border-color: rgba(52, 211, 153, 0.24);
+            color: #bbf7d0;
+            background: rgba(52, 211, 153, 0.12);
+        }
+
+        .status-chip.connected::before {
+            background: var(--success);
+        }
+
+        .status-chip.failed,
+        .status-chip.disconnected {
+            border-color: rgba(251, 113, 133, 0.24);
+            color: #fecdd3;
+            background: rgba(251, 113, 133, 0.12);
+        }
+
+        .status-chip.failed::before,
+        .status-chip.disconnected::before {
+            background: var(--danger);
+        }
+
+        .retry-pill {
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 12px;
+            color: var(--muted-strong);
+            background: rgba(255, 255, 255, 0.04);
+            font-size: 0.88rem;
+        }
+
+        .meta-card h1 {
+            margin-top: 18px;
+            font-size: 1.34rem;
+            line-height: 1.15;
+            letter-spacing: -0.03em;
+        }
+
+        .meta-detail {
+            margin-top: 10px;
+            color: var(--muted);
+            font-size: 0.96rem;
+        }
+
+        .session-id {
+            display: block;
+            margin-top: 18px;
+            overflow: auto;
+            padding: 16px 18px;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 18px;
+            color: #d7f4ff;
+            background: #06101d;
+            font-size: 0.95rem;
+            white-space: nowrap;
+        }
+
+        .policy-list {
+            display: grid;
+            gap: 12px;
+            margin-top: 18px;
+            color: var(--muted-strong);
+        }
+
+        .policy-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 14px 16px;
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .policy-item-copy {
+            min-width: 0;
+        }
+
+        .policy-item strong {
+            display: block;
+            color: var(--text);
+            font-size: 0.96rem;
+        }
+
+        .policy-item-copy span {
+            display: block;
+            margin-top: 6px;
+            color: var(--muted);
+            line-height: 1.45;
+        }
+
+        .policy-bullet {
+            width: 10px;
+            height: 10px;
+            flex-shrink: 0;
+            margin-top: 7px;
+            border-radius: 50%;
+            background: var(--primary);
+            box-shadow: 0 0 0 6px rgba(56, 189, 248, 0.12);
+        }
+
+        .terminal-shell {
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 28px;
+            background: linear-gradient(180deg, rgba(10, 18, 33, 0.94), rgba(7, 17, 31, 0.98));
+            box-shadow: var(--shadow);
+        }
+
+        .terminal-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 14px 18px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+            background: rgba(5, 12, 21, 0.78);
+        }
+
+        .window-dots {
+            display: flex;
+            gap: 8px;
+        }
+
+        .window-dots span {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.22);
+        }
+
+        .window-dots span:nth-child(1) {
+            background: #fb7185;
+        }
+
+        .window-dots span:nth-child(2) {
+            background: #fbbf24;
+        }
+
+        .window-dots span:nth-child(3) {
+            background: #34d399;
+        }
+
+        .toolbar-meta {
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .toolbar-copy {
+            min-width: 0;
+        }
+
+        .toolbar-copy strong {
+            display: block;
+            font-size: 0.95rem;
+        }
+
+        .toolbar-copy span {
+            display: block;
+            overflow: hidden;
+            color: var(--muted);
+            font-size: 0.84rem;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .toolbar-side {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--muted);
+            font-size: 0.84rem;
+        }
+
+        .toolbar-badge {
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .connection-banner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            padding: 14px 18px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .connection-banner.hidden {
+            display: none;
+        }
+
+        .connection-banner[data-state="reconnecting"],
+        .connection-banner[data-state="connecting"] {
+            background: rgba(56, 189, 248, 0.08);
+        }
+
+        .connection-banner[data-state="waiting-cli"],
+        .connection-banner[data-state="offline"] {
+            background: rgba(245, 158, 11, 0.08);
+        }
+
+        .connection-banner[data-state="failed"],
+        .connection-banner[data-state="disconnected"] {
+            background: rgba(251, 113, 133, 0.08);
+        }
+
+        .banner-copy strong {
+            display: block;
+            font-size: 0.96rem;
+        }
+
+        .banner-copy p {
+            margin-top: 6px;
+            color: var(--muted);
+            font-size: 0.92rem;
         }
 
         .terminal-container {
             flex: 1;
-            padding: 20px;
-            overflow: hidden;
+            min-height: 0;
+            padding: 18px;
         }
 
         #terminal {
             width: 100%;
             height: 100%;
-            background: #1e1e1e;
+            overflow: hidden;
+            border-radius: 22px;
+            background: #07111f;
+            box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.16);
         }
 
-        .footer {
-            background: #2d2d2d;
-            padding: 10px 20px;
-            border-top: 1px solid #3e3e3e;
-            font-size: 12px;
-            color: #8a8a8a;
-            display: flex;
-            justify-content: space-between;
-            transition: opacity 0.3s ease, transform 0.3s ease;
+        .empty-state {
+            height: 100%;
+            padding: 24px;
+            display: grid;
+            place-items: center;
+            color: var(--text);
         }
 
-        /* 隐藏页头和页脚的样式 */
-        .header.hidden,
-        .footer.hidden {
-            opacity: 0;
-            pointer-events: none;
-            transform: translateY(-20px);
+        .empty-state-card {
+            max-width: 520px;
+            padding: 28px;
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.04);
+            text-align: left;
         }
 
-        .footer.hidden {
-            transform: translateY(20px);
+        .empty-state-card h1 {
+            font-size: 1.35rem;
         }
 
-        /* 隐藏页头时，终端容器占据全部空间 */
-        body.has-connected .header,
-        body.has-connected .footer {
-            display: none;
+        .empty-state-card p {
+            margin-top: 12px;
+            color: var(--muted);
         }
 
-        body.has-connected .terminal-container {
-            padding: 0;
+        @media (max-width: 1080px) {
+            .meta-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                overflow: auto;
+            }
+
+            .app-shell {
+                padding: 14px;
+            }
+
+            .topbar,
+            .terminal-toolbar,
+            .connection-banner {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .action-group,
+            .toolbar-side {
+                width: 100%;
+                flex-wrap: wrap;
+            }
+
+            .action-group .action-button {
+                flex: 1;
+            }
+
+            .terminal-container {
+                height: 70vh;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation: none !important;
+                transition: none !important;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="logo">CliGool - 远程终端</div>
-        <div class="controls">
-            <span class="status disconnected" id="connection-status">未连接</span>
-            <span class="session-info" id="session-info">正在加载...</span>
-            <button id="disconnect-btn" class="disconnect-btn" style="display: none;">断开</button>
-        </div>
-    </div>
-
-    <div class="terminal-container">
-        <div id="terminal"></div>
-    </div>
-
-    <div class="footer">
-        <div class="shortcuts">
-            <div class="shortcut-item">
-                <kbd>Ctrl</kbd> + <kbd>C</kbd> 复制
+    <div class="app-shell">
+        <header class="topbar">
+            <div class="brand">
+                <div class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 12h7"></path>
+                        <path d="M9 7l5 5-5 5"></path>
+                        <path d="M14 19h6"></path>
+                    </svg>
+                </div>
+                <div class="brand-copy">
+                    <strong>CliGool Terminal</strong>
+                    <span>自动恢复 · 明确状态 · 真实终端</span>
+                </div>
             </div>
-            <div class="shortcut-item">
-                <kbd>Ctrl</kbd> + <kbd>V</kbd> 粘贴
+
+            <div class="action-group">
+                <a class="action-button link" href="/">返回下载页</a>
+                <button id="manual-reconnect-btn" class="action-button secondary hidden" type="button">立即重连</button>
+                <button id="disconnect-btn" class="action-button danger hidden" type="button">断开会话</button>
             </div>
-        </div>
-        <div class="info">
-            CliGool 远程终端
+        </header>
+
+        <div class="workspace">
+            <section class="meta-grid">
+                <article class="meta-card">
+                    <p class="meta-label">连接状态</p>
+                    <div class="status-row">
+                        <span class="status-chip connecting" id="connection-status">连接中</span>
+                        <span class="retry-pill" id="retry-pill">自动恢复已就绪</span>
+                    </div>
+                    <h1 id="status-title">正在准备浏览器终端</h1>
+                    <p class="meta-detail" id="status-detail" aria-live="polite">正在为当前 session 建立 WebSocket 通道。</p>
+                </article>
+
+                <article class="meta-card">
+                    <p class="meta-label">会话标识</p>
+                    <code class="session-id" id="session-info">正在解析...</code>
+                    <p class="meta-detail">保留当前 URL 即可重新进入同一会话；Web 终端会在网络抖动后自动尝试回到现场。</p>
+                </article>
+
+                <article class="meta-card">
+                    <p class="meta-label">恢复策略</p>
+                    <div class="policy-list">
+                        <div class="policy-item">
+                            <span class="policy-bullet" aria-hidden="true"></span>
+                            <div class="policy-item-copy"><strong>指数退避自动重连</strong><span>从快速重试开始，逐步拉长间隔，避免频繁抖动。</span></div>
+                        </div>
+                        <div class="policy-item">
+                            <span class="policy-bullet" aria-hidden="true"></span>
+                            <div class="policy-item-copy"><strong>等待 CLI 恢复</strong><span>当 CLI 暂未连接时，页面会明确提示并持续自动检查。</span></div>
+                        </div>
+                    </div>
+                    <p class="meta-detail" id="recovery-note">如果自动重连达到上限，页面会保留手动恢复入口。</p>
+                </article>
+            </section>
+
+            <section class="terminal-shell">
+                <div class="terminal-toolbar">
+                    <div class="toolbar-meta">
+                        <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+                        <div class="toolbar-copy">
+                            <strong id="toolbar-title">终端链路初始化中</strong>
+                            <span id="toolbar-subtitle">准备连接会话并同步终端尺寸。</span>
+                        </div>
+                    </div>
+                    <div class="toolbar-side">
+                        <div class="toolbar-badge" id="toolbar-attempts">自动重连: 0 / 10</div>
+                        <div class="toolbar-badge">快捷键: Ctrl/Cmd + Shift + C / V</div>
+                    </div>
+                </div>
+
+                <div class="connection-banner" id="connection-banner" data-state="connecting">
+                    <div class="banner-copy">
+                        <strong id="banner-title">正在连接远端终端</strong>
+                        <p id="banner-detail" aria-live="polite">首次建立 WebSocket 时会自动协商终端大小与会话状态。</p>
+                    </div>
+                    <button id="banner-action" class="action-button secondary hidden" type="button">立即重试</button>
+                </div>
+
+                <div class="terminal-container">
+                    <div id="terminal"></div>
+                </div>
+            </section>
         </div>
     </div>
 
-    <!-- 使用本地托管的xterm.js -->
     <link rel="stylesheet" href="/lib/xterm.css?v=5.3.0">
     <script src="/lib/xterm.js?v=5.3.0"></script>
     <script src="/lib/xterm-addon-fit.js?v=5.3.0"></script>
     <script src="/lib/xterm-addon-webgl.js?v=5.3.0"></script>
+    <script src="/lib/i18n.js?v=20260309"></script>
 
     <script>
-        // 全局变量
+        const terminalTranslations = {
+            'zh-CN': {
+                meta: {
+                    lang: 'zh-CN',
+                    title: 'CliGool - 远程终端',
+                    description: 'CliGool Web Terminal - 自动恢复、状态可见的浏览器终端体验。'
+                },
+                static: {
+                    brandSubtitle: '自动恢复 · 明确状态 · 真实终端',
+                    backToDownloads: '返回下载页',
+                    manualReconnect: '立即重连',
+                    disconnect: '断开会话',
+                    connectionStatusLabel: '连接状态',
+                    sessionLabel: '会话标识',
+                    sessionDetail: '保留当前 URL 即可重新进入同一会话；Web 终端会在网络抖动后自动尝试回到现场。',
+                    recoveryLabel: '恢复策略',
+                    policy1Title: '指数退避自动重连',
+                    policy1Body: '从快速重试开始，逐步拉长间隔，避免频繁抖动。',
+                    policy2Title: '等待 CLI 恢复',
+                    policy2Body: '当 CLI 暂未连接时，页面会明确提示并持续自动检查。',
+                    shortcutHint: '快捷键: Ctrl/Cmd + Shift + C / V',
+                    bannerAction: '立即重试'
+                },
+                states: {
+                    connecting: {
+                        chip: '连接中',
+                        title: '正在建立浏览器终端通道',
+                        detail: '正在为当前 session 建立 WebSocket 通道。',
+                        bannerTitle: '正在连接远端终端',
+                        bannerDetail: '首次建立 WebSocket 时会自动协商终端大小与会话状态。'
+                    },
+                    connected: {
+                        chip: '已连接',
+                        title: '浏览器终端已就绪',
+                        detail: '终端流在线，输入输出正在实时同步。',
+                        bannerTitle: '',
+                        bannerDetail: ''
+                    },
+                    reconnecting: {
+                        chip: '自动重连',
+                        title: '正在恢复终端流',
+                        detail: '连接短暂中断，页面正在自动恢复。',
+                        bannerTitle: '正在自动恢复 WebSocket',
+                        bannerDetail: '请稍候，浏览器会按指数退避策略继续尝试。'
+                    },
+                    'waiting-cli': {
+                        chip: '等待 CLI',
+                        title: '等待 CLI 客户端回到会话',
+                        detail: 'CLI 客户端暂未连接，页面会继续自动检查。',
+                        bannerTitle: 'CLI 客户端暂未在线',
+                        bannerDetail: '当 CLI 回到同一个 session，浏览器会自动恢复终端。'
+                    },
+                    failed: {
+                        chip: '连接失败',
+                        title: '自动恢复已暂停',
+                        detail: '已经达到自动重连上限，请检查网络或 CLI 状态后手动重试。',
+                        bannerTitle: '需要手动恢复',
+                        bannerDetail: '请检查服务、网络或 CLI 客户端，然后点击“立即重连”。'
+                    },
+                    disconnected: {
+                        chip: '已断开',
+                        title: '会话当前未连接',
+                        detail: '你已手动断开 Web 终端连接。',
+                        bannerTitle: '连接已断开',
+                        bannerDetail: '如果需要继续访问该会话，可以随时手动重连。'
+                    },
+                    offline: {
+                        chip: '网络离线',
+                        title: '等待本地网络恢复',
+                        detail: '检测到本地网络离线，恢复后会立即继续连接。',
+                        bannerTitle: '网络暂时不可用',
+                        bannerDetail: '本地网络恢复后，浏览器会立即重试当前会话。'
+                    }
+                },
+                status: {
+                    justNow: '刚刚',
+                    autoRecoverReady: '自动恢复已就绪',
+                    lastConnected: '最近连接: {time}',
+                    autoReconnectCount: '自动重连 {attempts} / {max}',
+                    toolbarAttempts: '自动重连: {attempts} / {max}',
+                    connectedSince: '终端链路在线 · 最近建立于 {time}。',
+                    recoveryConnected: '自动重连保持开启；如果网络波动，页面会优先自动恢复。',
+                    recoveryFailed: '自动重连已暂停，请确认网络或 CLI 客户端状态后再手动恢复。',
+                    recoveryOffline: '网络恢复后页面会立即重新建立连接。',
+                    recoveryDefault: '如果自动重连达到上限，页面会保留手动恢复入口。',
+                    failedCli: 'CLI 客户端长时间未恢复，请检查 CLI 进程后手动重试。',
+                    failedNetwork: '已达到自动重连上限，请检查网络或 Relay 服务后手动重试。',
+                    waitingCliPreserved: 'CLI 客户端暂未在线，当前终端内容已保留，页面会持续自动恢复。',
+                    waitingCliInitial: 'CLI 客户端尚未连接，页面会自动持续重试。',
+                    waitingCliClosed: 'CLI 客户端已断开，页面会持续自动等待它重新进入当前 session。',
+                    waitingCliDelay: 'CLI 客户端暂未在线，将在 {delay} 后继续检查（{attempts}/{max}）。',
+                    reconnectingDelay: '连接已中断，将在 {delay} 后自动重连（{attempts}/{max}）。',
+                    waitingCliBanner: '页面已进入等待 CLI 模式，会持续自动尝试恢复。',
+                    reconnectingBanner: '正在按照指数退避策略恢复终端连接。',
+                    connectionAttempt: '正在发起第 {attempt} 次连接尝试。',
+                    initialDetail: '正在为当前 session 建立 WebSocket 通道。',
+                    delaySeconds: '{count} 秒',
+                    resourcesMissing: 'xterm.js 资源未加载，无法初始化终端。',
+                    initFailed: '终端初始化失败，请刷新页面后重试。'
+                },
+                notices: {
+                    recovered: '连接已恢复，继续同步终端输出。',
+                    waitingCli: 'CLI 客户端暂未连接，浏览器正在后台等待它恢复。',
+                    cliDisconnected: 'CLI 客户端已断开，浏览器正在持续等待恢复。',
+                    sessionClosed: '会话已关闭，正在尝试重新建立连接。'
+                },
+                noCli: {
+                    title: '当前 session 还没有 CLI 客户端接入',
+                    steps: [
+                        '下载并运行对应平台的 CliGool 客户端',
+                        '确认客户端使用相同的 session ID',
+                        '页面会自动继续重试，无需手动刷新'
+                    ],
+                    waiting: '等待 CLI 客户端上线中...'
+                },
+                emptyState: {
+                    resourcesTitle: '终端资源加载失败',
+                    resourcesBody: 'xterm.js 未能正确加载，请检查网络或刷新页面后重试。',
+                    initTitle: '终端初始化失败'
+                },
+                logs: {
+                    webglUnavailable: 'WebGL addon 不可用，继续使用基础渲染:',
+                    createWsFailed: '创建 WebSocket 失败:',
+                    parseMessageFailed: '解析 WebSocket 消息失败:',
+                    websocketError: 'WebSocket 错误:',
+                    terminalInitFailed: '终端初始化失败:'
+                }
+            },
+            en: {
+                meta: {
+                    lang: 'en',
+                    title: 'CliGool - Remote Terminal',
+                    description: 'CliGool Web Terminal - browser terminal experience with visible state and automatic recovery.'
+                },
+                static: {
+                    brandSubtitle: 'Auto recovery · clear state · real terminal',
+                    backToDownloads: 'Back to downloads',
+                    manualReconnect: 'Reconnect now',
+                    disconnect: 'Disconnect session',
+                    connectionStatusLabel: 'Connection status',
+                    sessionLabel: 'Session ID',
+                    sessionDetail: 'Keep this URL to re-enter the same session later. The web terminal will automatically try to return after network jitter.',
+                    recoveryLabel: 'Recovery policy',
+                    policy1Title: 'Exponential backoff reconnects',
+                    policy1Body: 'Start with fast retries, then gradually extend the delay to avoid constant flapping.',
+                    policy2Title: 'Wait for the CLI to return',
+                    policy2Body: 'When the CLI is offline, the page clearly explains the state and keeps checking automatically.',
+                    shortcutHint: 'Shortcuts: Ctrl/Cmd + Shift + C / V',
+                    bannerAction: 'Retry now'
+                },
+                states: {
+                    connecting: {
+                        chip: 'Connecting',
+                        title: 'Opening the browser terminal channel',
+                        detail: 'Creating the WebSocket channel for this session.',
+                        bannerTitle: 'Connecting to the remote terminal',
+                        bannerDetail: 'The first connection also negotiates terminal size and session state.'
+                    },
+                    connected: {
+                        chip: 'Connected',
+                        title: 'Browser terminal is ready',
+                        detail: 'The terminal stream is online and input/output are syncing live.',
+                        bannerTitle: '',
+                        bannerDetail: ''
+                    },
+                    reconnecting: {
+                        chip: 'Reconnecting',
+                        title: 'Recovering the terminal stream',
+                        detail: 'The connection was interrupted briefly and the page is restoring it.',
+                        bannerTitle: 'Recovering the WebSocket connection',
+                        bannerDetail: 'Please wait while the browser keeps retrying with exponential backoff.'
+                    },
+                    'waiting-cli': {
+                        chip: 'Waiting for CLI',
+                        title: 'Waiting for the CLI client to return',
+                        detail: 'The CLI client is offline for now. This page will keep checking automatically.',
+                        bannerTitle: 'The CLI client is currently offline',
+                        bannerDetail: 'As soon as the CLI rejoins the same session, the browser terminal will recover automatically.'
+                    },
+                    failed: {
+                        chip: 'Failed',
+                        title: 'Auto recovery is paused',
+                        detail: 'The reconnect limit was reached. Check the network or CLI state and retry manually.',
+                        bannerTitle: 'Manual recovery required',
+                        bannerDetail: 'Check the service, network, or CLI client and then reconnect manually.'
+                    },
+                    disconnected: {
+                        chip: 'Disconnected',
+                        title: 'The session is not connected',
+                        detail: 'You manually disconnected the web terminal.',
+                        bannerTitle: 'Connection closed',
+                        bannerDetail: 'You can reconnect manually whenever you want to continue this session.'
+                    },
+                    offline: {
+                        chip: 'Offline',
+                        title: 'Waiting for local network access',
+                        detail: 'The browser detected local network loss and will continue as soon as the network returns.',
+                        bannerTitle: 'Network temporarily unavailable',
+                        bannerDetail: 'The browser will retry this session as soon as local network access returns.'
+                    }
+                },
+                status: {
+                    justNow: 'just now',
+                    autoRecoverReady: 'Auto recovery ready',
+                    lastConnected: 'Last connected: {time}',
+                    autoReconnectCount: 'Auto reconnect {attempts} / {max}',
+                    toolbarAttempts: 'Auto reconnect: {attempts} / {max}',
+                    connectedSince: 'Terminal path online · established at {time}.',
+                    recoveryConnected: 'Auto reconnect stays enabled. If the network wobbles, the page tries to recover first.',
+                    recoveryFailed: 'Auto recovery is paused. Check the network or CLI client and reconnect manually.',
+                    recoveryOffline: 'The page will reconnect as soon as local network access returns.',
+                    recoveryDefault: 'If auto reconnect reaches the limit, the page keeps a manual recovery action available.',
+                    failedCli: 'The CLI client did not return in time. Check the CLI process and retry manually.',
+                    failedNetwork: 'The auto reconnect limit was reached. Check the network or relay service and retry manually.',
+                    waitingCliPreserved: 'The CLI client is offline for now. Terminal content is preserved and the page will keep recovering in the background.',
+                    waitingCliInitial: 'The CLI client is not connected yet. The page will keep retrying automatically.',
+                    waitingCliClosed: 'The CLI client disconnected. This page will keep waiting for it to rejoin the current session.',
+                    waitingCliDelay: 'The CLI client is still offline. Checking again in {delay} ({attempts}/{max}).',
+                    reconnectingDelay: 'The connection was interrupted. Reconnecting in {delay} ({attempts}/{max}).',
+                    waitingCliBanner: 'The page entered CLI-wait mode and will keep trying automatically.',
+                    reconnectingBanner: 'Restoring the terminal connection with exponential backoff.',
+                    connectionAttempt: 'Starting connection attempt {attempt}.',
+                    initialDetail: 'Creating the WebSocket channel for this session.',
+                    delaySeconds: '{count} sec',
+                    resourcesMissing: 'The xterm.js assets did not load, so the terminal cannot be initialized.',
+                    initFailed: 'Terminal initialization failed. Refresh the page and try again.'
+                },
+                notices: {
+                    recovered: 'Connection restored. Continuing terminal sync.',
+                    waitingCli: 'The CLI client is offline for now. The browser is waiting for it in the background.',
+                    cliDisconnected: 'The CLI client disconnected. The browser will keep waiting for it to return.',
+                    sessionClosed: 'The session closed. Trying to establish the connection again.'
+                },
+                noCli: {
+                    title: 'No CLI client is connected to this session yet',
+                    steps: [
+                        'Download and run the CliGool client for the correct platform',
+                        'Make sure the client uses the same session ID',
+                        'This page keeps retrying automatically, so no manual refresh is needed'
+                    ],
+                    waiting: 'Waiting for the CLI client to come online...'
+                },
+                emptyState: {
+                    resourcesTitle: 'Terminal assets failed to load',
+                    resourcesBody: 'xterm.js did not load correctly. Check the network or refresh the page and try again.',
+                    initTitle: 'Terminal initialization failed'
+                },
+                logs: {
+                    webglUnavailable: 'WebGL addon is unavailable. Falling back to the base renderer:',
+                    createWsFailed: 'Failed to create WebSocket:',
+                    parseMessageFailed: 'Failed to parse WebSocket message:',
+                    websocketError: 'WebSocket error:',
+                    terminalInitFailed: 'Terminal initialization failed:'
+                }
+            },
+            ja: {
+                meta: {
+                    lang: 'ja',
+                    title: 'CliGool - リモートターミナル',
+                    description: 'CliGool Web Terminal - 状態が見える自動復旧対応のブラウザターミナル。'
+                },
+                static: {
+                    brandSubtitle: '自動復旧 · 状態が明確 · 本物の端末',
+                    backToDownloads: 'ダウンロードへ戻る',
+                    manualReconnect: '今すぐ再接続',
+                    disconnect: 'セッションを切断',
+                    connectionStatusLabel: '接続状態',
+                    sessionLabel: 'セッション ID',
+                    sessionDetail: 'この URL を保持すると同じセッションへ再入場できます。ネットワークが揺れても Web 端末が自動で復帰を試みます。',
+                    recoveryLabel: '復旧ポリシー',
+                    policy1Title: '指数バックオフで自動再接続',
+                    policy1Body: '最初は素早く再試行し、徐々に間隔を伸ばして不安定な接続で揺れ続けないようにします。',
+                    policy2Title: 'CLI の復帰を待機',
+                    policy2Body: 'CLI がオフラインの間も、ページが状態を明確に示しながら自動で確認を続けます。',
+                    shortcutHint: 'ショートカット: Ctrl/Cmd + Shift + C / V',
+                    bannerAction: '今すぐ再試行'
+                },
+                states: {
+                    connecting: {
+                        chip: '接続中',
+                        title: 'ブラウザ端末チャネルを確立中',
+                        detail: '現在の session 用に WebSocket チャネルを作成しています。',
+                        bannerTitle: 'リモート端末へ接続しています',
+                        bannerDetail: '初回接続では端末サイズとセッション状態も自動的に同期します。'
+                    },
+                    connected: {
+                        chip: '接続済み',
+                        title: 'ブラウザ端末の準備ができました',
+                        detail: '端末ストリームがオンラインで、入出力をリアルタイム同期しています。',
+                        bannerTitle: '',
+                        bannerDetail: ''
+                    },
+                    reconnecting: {
+                        chip: '自動再接続',
+                        title: '端末ストリームを復旧中',
+                        detail: '接続が一時的に切れました。ページが自動で復旧しています。',
+                        bannerTitle: 'WebSocket 接続を復旧しています',
+                        bannerDetail: 'ブラウザが指数バックオフで再試行するまで少しお待ちください。'
+                    },
+                    'waiting-cli': {
+                        chip: 'CLI 待機',
+                        title: 'CLI クライアントの復帰を待っています',
+                        detail: 'CLI クライアントが現在オフラインです。このページは自動確認を続けます。',
+                        bannerTitle: 'CLI クライアントは現在オフラインです',
+                        bannerDetail: '同じ session に CLI が戻ると、ブラウザ端末が自動的に復旧します。'
+                    },
+                    failed: {
+                        chip: '失敗',
+                        title: '自動復旧は停止中です',
+                        detail: '再接続上限に達しました。ネットワークまたは CLI の状態を確認して手動で再試行してください。',
+                        bannerTitle: '手動復旧が必要です',
+                        bannerDetail: 'サービス、ネットワーク、CLI クライアントを確認してから手動で再接続してください。'
+                    },
+                    disconnected: {
+                        chip: '切断済み',
+                        title: '現在このセッションへ接続していません',
+                        detail: 'Web 端末を手動で切断しました。',
+                        bannerTitle: '接続が切断されました',
+                        bannerDetail: 'このセッションを続ける場合はいつでも手動で再接続できます。'
+                    },
+                    offline: {
+                        chip: 'オフライン',
+                        title: 'ローカルネットワークの復帰を待機中',
+                        detail: 'ローカルネットワークの切断を検知しました。復帰後すぐに再接続を続行します。',
+                        bannerTitle: 'ネットワークを利用できません',
+                        bannerDetail: 'ローカルネットワークが戻り次第、このセッションへ即座に再試行します。'
+                    }
+                },
+                status: {
+                    justNow: 'たった今',
+                    autoRecoverReady: '自動復旧の準備完了',
+                    lastConnected: '直近の接続: {time}',
+                    autoReconnectCount: '自動再接続 {attempts} / {max}',
+                    toolbarAttempts: '自動再接続: {attempts} / {max}',
+                    connectedSince: '端末経路はオンラインです · {time} に確立されました。',
+                    recoveryConnected: '自動再接続は有効のままです。ネットワークが揺れてもページが先に復旧を試みます。',
+                    recoveryFailed: '自動復旧は停止中です。ネットワークまたは CLI を確認して手動で再接続してください。',
+                    recoveryOffline: 'ローカルネットワークが戻り次第、ページが直ちに再接続します。',
+                    recoveryDefault: '自動再接続が上限に達しても、手動復旧ボタンは残ります。',
+                    failedCli: 'CLI クライアントが長時間戻っていません。CLI プロセスを確認して手動で再試行してください。',
+                    failedNetwork: '自動再接続の上限に達しました。ネットワークまたは Relay を確認して手動で再試行してください。',
+                    waitingCliPreserved: 'CLI クライアントは一時的にオフラインです。端末内容を保持したままページがバックグラウンドで復旧を続けます。',
+                    waitingCliInitial: 'CLI クライアントはまだ接続していません。ページが自動で再試行を続けます。',
+                    waitingCliClosed: 'CLI クライアントが切断されました。このページは同じ session への再入場を待ち続けます。',
+                    waitingCliDelay: 'CLI クライアントはまだオフラインです。{delay} 後に再確認します（{attempts}/{max}）。',
+                    reconnectingDelay: '接続が中断されました。{delay} 後に自動再接続します（{attempts}/{max}）。',
+                    waitingCliBanner: 'ページは CLI 待機モードに入り、自動復旧を継続します。',
+                    reconnectingBanner: '指数バックオフで端末接続を復旧しています。',
+                    connectionAttempt: '{attempt} 回目の接続を開始しています。',
+                    initialDetail: '現在の session 用に WebSocket チャネルを作成しています。',
+                    delaySeconds: '{count} 秒',
+                    resourcesMissing: 'xterm.js のリソースが読み込まれておらず、端末を初期化できません。',
+                    initFailed: '端末の初期化に失敗しました。ページを更新して再試行してください。'
+                },
+                notices: {
+                    recovered: '接続が復旧しました。端末同期を続行します。',
+                    waitingCli: 'CLI クライアントは現在オフラインです。ブラウザはバックグラウンドで復帰を待っています。',
+                    cliDisconnected: 'CLI クライアントが切断されました。ブラウザは継続して復帰を待ちます。',
+                    sessionClosed: 'セッションが閉じられました。接続の再確立を試みています。'
+                },
+                noCli: {
+                    title: 'この session にはまだ CLI クライアントが接続していません',
+                    steps: [
+                        '対象プラットフォーム用の CliGool クライアントをダウンロードして実行してください',
+                        'クライアントが同じ session ID を使用していることを確認してください',
+                        'このページは自動で再試行を続けるため、手動更新は不要です'
+                    ],
+                    waiting: 'CLI クライアントの接続を待っています...'
+                },
+                emptyState: {
+                    resourcesTitle: '端末リソースの読み込みに失敗しました',
+                    resourcesBody: 'xterm.js が正しく読み込まれていません。ネットワークを確認するか、ページを更新して再試行してください。',
+                    initTitle: '端末の初期化に失敗しました'
+                },
+                logs: {
+                    webglUnavailable: 'WebGL addon を利用できないため、基本レンダラーを使用します:',
+                    createWsFailed: 'WebSocket の作成に失敗しました:',
+                    parseMessageFailed: 'WebSocket メッセージの解析に失敗しました:',
+                    websocketError: 'WebSocket エラー:',
+                    terminalInitFailed: '端末の初期化に失敗しました:'
+                }
+            },
+            es: {
+                meta: {
+                    lang: 'es',
+                    title: 'CliGool - Terminal remota',
+                    description: 'CliGool Web Terminal - experiencia de terminal en navegador con estado visible y recuperación automática.'
+                },
+                static: {
+                    brandSubtitle: 'Recuperación automática · estado claro · terminal real',
+                    backToDownloads: 'Volver a descargas',
+                    manualReconnect: 'Reconectar ahora',
+                    disconnect: 'Desconectar sesión',
+                    connectionStatusLabel: 'Estado de conexión',
+                    sessionLabel: 'ID de sesión',
+                    sessionDetail: 'Conserva esta URL para volver a entrar en la misma sesión. La terminal web intentará regresar automáticamente tras cortes de red.',
+                    recoveryLabel: 'Política de recuperación',
+                    policy1Title: 'Reconexión con retroceso exponencial',
+                    policy1Body: 'Empieza con reintentos rápidos y luego amplía el intervalo para evitar oscilaciones constantes.',
+                    policy2Title: 'Esperar a que vuelva el CLI',
+                    policy2Body: 'Cuando el CLI está desconectado, la página lo indica con claridad y sigue comprobando automáticamente.',
+                    shortcutHint: 'Atajos: Ctrl/Cmd + Shift + C / V',
+                    bannerAction: 'Reintentar ahora'
+                },
+                states: {
+                    connecting: {
+                        chip: 'Conectando',
+                        title: 'Abriendo el canal de terminal en el navegador',
+                        detail: 'Creando el canal WebSocket para esta sesión.',
+                        bannerTitle: 'Conectando con la terminal remota',
+                        bannerDetail: 'La primera conexión también negocia el tamaño de terminal y el estado de la sesión.'
+                    },
+                    connected: {
+                        chip: 'Conectado',
+                        title: 'La terminal del navegador está lista',
+                        detail: 'El flujo de terminal está activo y la entrada/salida se sincroniza en tiempo real.',
+                        bannerTitle: '',
+                        bannerDetail: ''
+                    },
+                    reconnecting: {
+                        chip: 'Reconectando',
+                        title: 'Recuperando el flujo de terminal',
+                        detail: 'La conexión se interrumpió brevemente y la página la está restaurando.',
+                        bannerTitle: 'Recuperando la conexión WebSocket',
+                        bannerDetail: 'Espera mientras el navegador reintenta con retroceso exponencial.'
+                    },
+                    'waiting-cli': {
+                        chip: 'Esperando CLI',
+                        title: 'Esperando a que vuelva el cliente CLI',
+                        detail: 'El cliente CLI está desconectado por ahora. Esta página seguirá comprobando automáticamente.',
+                        bannerTitle: 'El cliente CLI está fuera de línea',
+                        bannerDetail: 'En cuanto el CLI vuelva a la misma sesión, la terminal del navegador se recuperará automáticamente.'
+                    },
+                    failed: {
+                        chip: 'Falló',
+                        title: 'La recuperación automática está en pausa',
+                        detail: 'Se alcanzó el límite de reconexión. Revisa la red o el estado del CLI y vuelve a intentarlo manualmente.',
+                        bannerTitle: 'Se requiere recuperación manual',
+                        bannerDetail: 'Comprueba el servicio, la red o el cliente CLI y luego reconecta manualmente.'
+                    },
+                    disconnected: {
+                        chip: 'Desconectado',
+                        title: 'La sesión no está conectada',
+                        detail: 'Desconectaste manualmente la terminal web.',
+                        bannerTitle: 'Conexión cerrada',
+                        bannerDetail: 'Puedes reconectar manualmente cuando quieras continuar esta sesión.'
+                    },
+                    offline: {
+                        chip: 'Sin red',
+                        title: 'Esperando la red local',
+                        detail: 'El navegador detectó pérdida de red local y continuará apenas vuelva.',
+                        bannerTitle: 'Red temporalmente no disponible',
+                        bannerDetail: 'El navegador reintentará esta sesión en cuanto vuelva la conectividad local.'
+                    }
+                },
+                status: {
+                    justNow: 'ahora mismo',
+                    autoRecoverReady: 'Recuperación automática lista',
+                    lastConnected: 'Última conexión: {time}',
+                    autoReconnectCount: 'Reconexión automática {attempts} / {max}',
+                    toolbarAttempts: 'Reconexión automática: {attempts} / {max}',
+                    connectedSince: 'Ruta de terminal activa · establecida a las {time}.',
+                    recoveryConnected: 'La reconexión automática sigue habilitada. Si la red oscila, la página intentará recuperarse primero.',
+                    recoveryFailed: 'La recuperación automática está en pausa. Revisa la red o el cliente CLI y reconecta manualmente.',
+                    recoveryOffline: 'La página se reconectará apenas vuelva la red local.',
+                    recoveryDefault: 'Si la reconexión automática llega al límite, la página mantiene una acción de recuperación manual.',
+                    failedCli: 'El cliente CLI no volvió a tiempo. Revisa el proceso CLI y vuelve a intentarlo manualmente.',
+                    failedNetwork: 'Se alcanzó el límite de reconexión automática. Revisa la red o el relay y vuelve a intentarlo manualmente.',
+                    waitingCliPreserved: 'El cliente CLI está desconectado por ahora. El contenido de la terminal se conserva y la página seguirá recuperándose en segundo plano.',
+                    waitingCliInitial: 'El cliente CLI todavía no está conectado. La página seguirá reintentando automáticamente.',
+                    waitingCliClosed: 'El cliente CLI se desconectó. Esta página seguirá esperando a que vuelva a la sesión actual.',
+                    waitingCliDelay: 'El cliente CLI sigue desconectado. Se comprobará otra vez en {delay} ({attempts}/{max}).',
+                    reconnectingDelay: 'La conexión se interrumpió. Reconectando en {delay} ({attempts}/{max}).',
+                    waitingCliBanner: 'La página entró en modo de espera del CLI y seguirá intentándolo automáticamente.',
+                    reconnectingBanner: 'Restaurando la conexión de terminal con retroceso exponencial.',
+                    connectionAttempt: 'Iniciando el intento de conexión {attempt}.',
+                    initialDetail: 'Creando el canal WebSocket para esta sesión.',
+                    delaySeconds: '{count} s',
+                    resourcesMissing: 'Los recursos de xterm.js no se cargaron y no se puede inicializar la terminal.',
+                    initFailed: 'La inicialización de la terminal falló. Recarga la página e inténtalo de nuevo.'
+                },
+                notices: {
+                    recovered: 'Conexión recuperada. Se continúa sincronizando la terminal.',
+                    waitingCli: 'El cliente CLI está desconectado por ahora. El navegador lo espera en segundo plano.',
+                    cliDisconnected: 'El cliente CLI se desconectó. El navegador seguirá esperando su regreso.',
+                    sessionClosed: 'La sesión se cerró. Intentando establecer la conexión otra vez.'
+                },
+                noCli: {
+                    title: 'Todavía no hay un cliente CLI conectado a esta sesión',
+                    steps: [
+                        'Descarga y ejecuta el cliente CliGool para la plataforma correcta',
+                        'Asegúrate de que el cliente use el mismo ID de sesión',
+                        'Esta página sigue reintentando automáticamente, así que no hace falta refrescar manualmente'
+                    ],
+                    waiting: 'Esperando a que el cliente CLI se conecte...'
+                },
+                emptyState: {
+                    resourcesTitle: 'Falló la carga de recursos de la terminal',
+                    resourcesBody: 'xterm.js no se cargó correctamente. Revisa la red o recarga la página e inténtalo de nuevo.',
+                    initTitle: 'La inicialización de la terminal falló'
+                },
+                logs: {
+                    webglUnavailable: 'El addon WebGL no está disponible. Se usa el renderizador básico:',
+                    createWsFailed: 'No se pudo crear el WebSocket:',
+                    parseMessageFailed: 'No se pudo analizar el mensaje WebSocket:',
+                    websocketError: 'Error de WebSocket:',
+                    terminalInitFailed: 'La inicialización de la terminal falló:'
+                }
+            }
+        };
+
+        const terminalI18n = window.CliGoolI18n.create({
+            fallback: 'en',
+            translations: terminalTranslations
+        });
+
+        terminalI18n.applyMeta();
+        terminalI18n.apply([
+            { selector: '.brand-copy span', key: 'static.brandSubtitle' },
+            { selector: '.action-group .action-button.link', key: 'static.backToDownloads' },
+            { selector: '#manual-reconnect-btn', key: 'static.manualReconnect' },
+            { selector: '#disconnect-btn', key: 'static.disconnect' },
+            { selector: '.meta-grid .meta-card:nth-child(1) .meta-label', key: 'static.connectionStatusLabel' },
+            { selector: '.meta-grid .meta-card:nth-child(2) .meta-label', key: 'static.sessionLabel' },
+            { selector: '.meta-grid .meta-card:nth-child(2) .meta-detail', key: 'static.sessionDetail' },
+            { selector: '.meta-grid .meta-card:nth-child(3) .meta-label', key: 'static.recoveryLabel' },
+            { selector: '.policy-list .policy-item:nth-child(1) .policy-item-copy strong', key: 'static.policy1Title' },
+            { selector: '.policy-list .policy-item:nth-child(1) .policy-item-copy span', key: 'static.policy1Body' },
+            { selector: '.policy-list .policy-item:nth-child(2) .policy-item-copy strong', key: 'static.policy2Title' },
+            { selector: '.policy-list .policy-item:nth-child(2) .policy-item-copy span', key: 'static.policy2Body' },
+            { selector: '.toolbar-side .toolbar-badge:nth-child(2)', key: 'static.shortcutHint' },
+            { selector: '#banner-action', key: 'static.bannerAction' }
+        ]);
+
+        const copy = terminalI18n.messages();
         let terminal = null;
         let fitAddon = null;
         let webglAddon = null;
         let ws = null;
-        let clientOS = 'unknown'; // 客户端操作系统类型
-        let hasReceivedFirstMessage = false; // 是否已接收过第一个WebSocket消息
+        let clientOS = 'unknown';
+        let hasReceivedFirstMessage = false;
+        let hasReceivedCachedMessages = false;
+        let hasConnectedToLiveSession = false;
+        let showingNoCliScreen = false;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 10;
+        const baseReconnectDelay = 1000;
+        const maxReconnectDelay = 30000;
+        let reconnectTimer = null;
+        let manualDisconnect = false;
+        let waitingForCli = false;
+        let wasRecovering = false;
+        let currentState = 'connecting';
+        let lastConnectedAt = null;
+        let hasCliSessionForCurrentConnection = false;
 
-        // 从URL获取会话ID
-        const pathParts = window.location.pathname.split('/');
-        const sessionId = pathParts[pathParts.length - 1];
+        const pathParts = window.location.pathname.split('/').filter(Boolean);
+        const sessionId = pathParts[pathParts.length - 1] || 'unknown-session';
+        const serverUrl = window.location.protocol === 'https:'
+            ? `wss://${window.location.host}`
+            : `ws://${window.location.host}`;
 
-        // 构建服务器URL
-        const serverUrl = window.location.protocol === 'https:' ? 'wss://' + window.location.host : 'ws://' + window.location.host;
+        const elements = {
+            appShell: document.querySelector('.app-shell'),
+            statusEl: document.getElementById('connection-status'),
+            retryPill: document.getElementById('retry-pill'),
+            statusTitle: document.getElementById('status-title'),
+            statusDetail: document.getElementById('status-detail'),
+            sessionInfo: document.getElementById('session-info'),
+            recoveryNote: document.getElementById('recovery-note'),
+            toolbarTitle: document.getElementById('toolbar-title'),
+            toolbarSubtitle: document.getElementById('toolbar-subtitle'),
+            toolbarAttempts: document.getElementById('toolbar-attempts'),
+            disconnectBtn: document.getElementById('disconnect-btn'),
+            manualReconnectBtn: document.getElementById('manual-reconnect-btn'),
+            banner: document.getElementById('connection-banner'),
+            bannerTitle: document.getElementById('banner-title'),
+            bannerDetail: document.getElementById('banner-detail'),
+            bannerAction: document.getElementById('banner-action')
+        };
 
-        // 更新会话信息显示
-        document.getElementById('session-info').textContent = '会话: ' + sessionId;
+        elements.sessionInfo.textContent = sessionId;
 
-        // 页面加载完成后初始化
-        window.addEventListener('load', function() {
-            // 检查Terminal是否加载成功
-            if (typeof Terminal === 'undefined') {
-                document.getElementById('terminal').innerHTML = '<div style="color:white;padding:20px;"><h1>❌ 加载失败</h1><p>xterm.js库未能加载，请检查网络连接或刷新页面</p></div>';
+        function t(path, vars) {
+            return terminalI18n.t(path, vars);
+        }
+
+        function stateCopy(state) {
+            return copy.states[state];
+        }
+
+        function isSocketOpen() {
+            return ws && ws.readyState === WebSocket.OPEN;
+        }
+
+        function safeFitTerminal() {
+            if (!fitAddon) {
+                return;
+            }
+            fitAddon.fit();
+        }
+
+        function sendJson(payload) {
+            if (!isSocketOpen()) {
+                return;
+            }
+            ws.send(JSON.stringify(payload));
+        }
+
+        function sendResize() {
+            if (!terminal || !isSocketOpen()) {
+                return;
+            }
+            const cols = terminal.cols || 0;
+            const rows = terminal.rows || 0;
+            if (!cols || !rows) {
+                return;
+            }
+            sendJson({
+                type: 'resize',
+                cols,
+                rows,
+                session: sessionId
+            });
+        }
+
+        function formatTime(date) {
+            return date.toLocaleTimeString(terminalI18n.language, {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+
+        function formatDelay(delay) {
+            return t('status.delaySeconds', {
+                count: Math.max(1, Math.round(delay / 1000))
+            });
+        }
+
+        function clearReconnectTimer() {
+            if (reconnectTimer) {
+                window.clearTimeout(reconnectTimer);
+                reconnectTimer = null;
+            }
+        }
+
+        function syncLiveTerminalMode() {
+            const liveTerminal = currentState === 'connected' && hasCliSessionForCurrentConnection;
+            elements.appShell.classList.toggle('live-terminal', liveTerminal);
+            window.requestAnimationFrame(() => {
+                safeFitTerminal();
+                if (liveTerminal && terminal) {
+                    terminal.focus();
+                }
+            });
+        }
+
+        function updateStatus(state, detailOverride, bannerOverride) {
+            currentState = state;
+            const stateText = stateCopy(state);
+            const detail = detailOverride || stateText.detail;
+            const bannerDetail = bannerOverride || stateText.bannerDetail;
+
+            elements.statusEl.className = `status-chip ${state}`;
+            elements.statusEl.textContent = stateText.chip;
+            elements.statusTitle.textContent = stateText.title;
+            elements.statusDetail.textContent = detail;
+            elements.toolbarTitle.textContent = stateText.title;
+            elements.toolbarSubtitle.textContent = detail;
+            elements.recoveryNote.textContent = state === 'connected'
+                ? t('status.recoveryConnected')
+                : state === 'failed'
+                    ? t('status.recoveryFailed')
+                    : state === 'offline'
+                        ? t('status.recoveryOffline')
+                        : t('status.recoveryDefault');
+            elements.retryPill.textContent = state === 'connected'
+                ? t('status.lastConnected', { time: lastConnectedAt ? formatTime(lastConnectedAt) : t('status.justNow') })
+                : reconnectAttempts > 0
+                    ? t('status.autoReconnectCount', { attempts: reconnectAttempts, max: maxReconnectAttempts })
+                    : t('status.autoRecoverReady');
+            elements.toolbarAttempts.textContent = t('status.toolbarAttempts', { attempts: reconnectAttempts, max: maxReconnectAttempts });
+            elements.disconnectBtn.classList.toggle('hidden', state !== 'connected');
+            elements.manualReconnectBtn.classList.toggle('hidden', state === 'connected' || state === 'connecting');
+
+            if (state === 'connected') {
+                elements.banner.classList.add('hidden');
+                elements.banner.dataset.state = state;
+                elements.bannerTitle.textContent = '';
+                elements.bannerDetail.textContent = '';
+                syncLiveTerminalMode();
                 return;
             }
 
-            try {
-                // 初始化终端
-                initTerminal();
+            elements.banner.classList.remove('hidden');
+            elements.banner.dataset.state = state;
+            elements.bannerTitle.textContent = stateText.bannerTitle;
+            elements.bannerDetail.textContent = bannerDetail;
+            elements.bannerAction.classList.toggle('hidden', state === 'connecting');
+            elements.bannerAction.disabled = state === 'offline';
+            syncLiveTerminalMode();
+        }
 
-                // 设置断开按钮事件
-                document.getElementById('disconnect-btn').addEventListener('click', disconnect);
+        function markCliSessionAvailable() {
+            hasCliSessionForCurrentConnection = true;
+            syncLiveTerminalMode();
+        }
 
-                // 自动连接WebSocket
-                setTimeout(connectWebSocket, 1000);
-
-            } catch (e) {
-                console.error('初始化失败:', e);
-                document.getElementById('terminal').innerHTML = '<div style="color:white;padding:20px;"><h1>❌ 初始化失败</h1><p>' + e.message + '</p></div>';
+        function writeSystemNotice(message, tone) {
+            if (!terminal || !message) {
+                return;
             }
-        });
+            const color = tone === 'error' ? '31' : tone === 'warn' ? '33' : '36';
+            terminal.writeln('');
+            terminal.writeln(`\x1b[${color}m[${formatTime(new Date())}] ${message}\x1b[0m`);
+            terminal.writeln('');
+        }
 
         function initTerminal() {
             terminal = new Terminal({
                 cursorBlink: true,
                 fontSize: 14,
-                fontFamily: 'Menlo, "Monaco", "Courier New", monospace',
+                fontFamily: 'Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
                 theme: {
-                    background: '#1e1e1e',
-                    foreground: '#d4d4d4',
-                    cursor: '#4ec9b0',
-                    black: '#000000',
-                    red: '#cd3131',
-                    green: '#0dbc79',
-                    yellow: '#e5e510',
-                    blue: '#2472c8',
-                    magenta: '#bc3fbc',
-                    cyan: '#11a8cd',
-                    white: '#e5e5e5',
+                    background: '#07111f',
+                    foreground: '#dce7f5',
+                    cursor: '#38bdf8',
+                    black: '#0b1220',
+                    red: '#f87171',
+                    green: '#34d399',
+                    yellow: '#fbbf24',
+                    blue: '#60a5fa',
+                    magenta: '#c084fc',
+                    cyan: '#22d3ee',
+                    white: '#e5efff',
+                    brightBlack: '#64748b',
+                    brightRed: '#fb7185',
+                    brightGreen: '#6ee7b7',
+                    brightYellow: '#fde68a',
+                    brightBlue: '#93c5fd',
+                    brightMagenta: '#d8b4fe',
+                    brightCyan: '#67e8f9',
+                    brightWhite: '#f8fbff'
                 },
-                scrollback: 1000,
+                scrollback: 3000,
                 tabStopWidth: 4,
-                // 启用高级终端特性
-                allowProposedApi: true,  // 允许使用实验性 API
-                convertEol: true,         // 自动转换换行符
-                // 终端选项
-                altClickMovesCursor: true, // Alt+点击移动光标
+                allowProposedApi: true,
+                convertEol: true,
+                altClickMovesCursor: true
             });
 
-            // 加载插件
             fitAddon = new FitAddon.FitAddon();
             terminal.loadAddon(fitAddon);
 
-            webglAddon = new WebglAddon.WebglAddon();
-            terminal.loadAddon(webglAddon);
+            try {
+                webglAddon = new WebglAddon.WebglAddon();
+                terminal.loadAddon(webglAddon);
+            } catch (error) {
+                console.warn(copy.logs.webglUnavailable, error);
+            }
 
-            // 挂载终端
             terminal.open(document.getElementById('terminal'));
-            fitAddon.fit();
+            safeFitTerminal();
+            terminal.focus();
 
-            // 监听窗口大小变化
             window.addEventListener('resize', () => {
-                fitAddon.fit();
+                safeFitTerminal();
+                sendResize();
             });
 
-            // 注意：不在这里显示欢迎信息，避免闪烁
-            // 等待WebSocket连接并接收消息后再显示内容
+            terminal.onData((data) => {
+                if (!isSocketOpen()) {
+                    return;
+                }
 
-            // 终端输入处理
-            terminal.onData(data => {
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    // 使用更高效的发送方式
-                    ws.send(JSON.stringify({
-                        type: 'input',
-                        data: data,
-                        session: sessionId,
-                        source: 'web'
-                    }));
+                sendJson({
+                    type: 'input',
+                    data,
+                    session: sessionId,
+                    source: 'web'
+                });
 
-                    // 根据客户端操作系统类型决定是否本地回显
-                    // Windows管道模式: 不会自动回显，需要本地回显
-                    // Unix PTY模式: PTY会自动回显，不需要本地回显（避免重复）
-                    if (clientOS === 'windows') {
-                        // Windows: 立即本地回显
-                        terminal.write(data);
-                    }
-                    // Unix: 不本地回显，等待PTY回显
+                if (clientOS === 'windows') {
+                    terminal.write(data);
                 }
             });
 
-            // 终端大小变化处理
-            terminal.onResize(({ cols, rows }) => {
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        type: 'resize',
-                        cols: cols,
-                        rows: rows,
-                        session: sessionId
-                    }));
-                }
+            terminal.onResize(() => {
+                sendResize();
             });
         }
 
-        function connectWebSocket() {
-            updateConnectionStatus('connecting');
+        function scheduleReconnect() {
+            if (manualDisconnect) {
+                return;
+            }
 
-            // 构建WebSocket URL
-            const wsUrl = `${serverUrl}/api/terminal/${sessionId}?type=web&user_id=web-${Date.now()}`;
+            if (!navigator.onLine) {
+                updateStatus('offline');
+                return;
+            }
 
-            // 注意：不在这里显示连接信息，避免闪烁
+            if (reconnectTimer) {
+                return;
+            }
+
+            if (reconnectAttempts >= maxReconnectAttempts) {
+                updateStatus(
+                    'failed',
+                    waitingForCli ? t('status.failedCli') : t('status.failedNetwork')
+                );
+                return;
+            }
+
+            reconnectAttempts += 1;
+            wasRecovering = true;
+            const delay = Math.min(baseReconnectDelay * Math.pow(2, reconnectAttempts - 1), maxReconnectDelay);
+            updateStatus(
+                waitingForCli ? 'waiting-cli' : 'reconnecting',
+                waitingForCli
+                    ? t('status.waitingCliDelay', { delay: formatDelay(delay), attempts: reconnectAttempts, max: maxReconnectAttempts })
+                    : t('status.reconnectingDelay', { delay: formatDelay(delay), attempts: reconnectAttempts, max: maxReconnectAttempts }),
+                waitingForCli ? t('status.waitingCliBanner') : t('status.reconnectingBanner')
+            );
+
+            reconnectTimer = window.setTimeout(() => {
+                reconnectTimer = null;
+                connectWebSocket('retry');
+            }, delay);
+        }
+
+        function connectWebSocket(reason) {
+            if (manualDisconnect) {
+                return;
+            }
+
+            if (!navigator.onLine) {
+                updateStatus('offline');
+                return;
+            }
+
+            if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+                return;
+            }
+
+            clearReconnectTimer();
+            hasCliSessionForCurrentConnection = false;
+            updateStatus(
+                reconnectAttempts > 0 || reason !== 'initial' ? 'reconnecting' : 'connecting',
+                reconnectAttempts > 0 || reason !== 'initial'
+                    ? t('status.connectionAttempt', { attempt: reconnectAttempts + 1 })
+                    : t('status.initialDetail')
+            );
+
+            const userId = `web-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            const wsUrl = `${serverUrl}/api/terminal/${encodeURIComponent(sessionId)}?type=web&user_id=${encodeURIComponent(userId)}`;
 
             try {
                 ws = new WebSocket(wsUrl);
-
-                ws.onopen = () => {
-                    updateConnectionStatus('connected');
-
-                    // 自动隐藏页头和页尾
-                    document.body.classList.add('has-connected');
-                    document.querySelector('.header').classList.add('hidden');
-                    document.querySelector('.footer').classList.add('hidden');
-
-                    // 不在这里发送回车，等待init消息后再发送
-                };
-
-                ws.onmessage = (event) => {
-                    try {
-                        const msg = JSON.parse(event.data);
-                        handleTerminalMessage(msg);
-                    } catch (e) {
-                        console.error('解析消息失败:', e, event.data);
-                    }
-                };
-
-                ws.onerror = (error) => {
-                    console.error('WebSocket错误:', error);
-                    updateConnectionStatus('disconnected');
-                };
-
-                ws.onclose = (event) => {
-                    console.log('WebSocket关闭:', event);
-                    updateConnectionStatus('disconnected');
-
-                    // 重新显示页头和页尾
-                    document.body.classList.remove('has-connected');
-                    document.querySelector('.header').classList.remove('hidden');
-                    document.querySelector('.footer').classList.remove('hidden');
-                };
-
             } catch (error) {
-                console.error('连接失败:', error);
-                updateConnectionStatus('disconnected');
+                console.error(copy.logs.createWsFailed, error);
+                scheduleReconnect();
+                return;
             }
+
+            ws.onopen = () => {
+                lastConnectedAt = new Date();
+                const recovered = wasRecovering || reconnectAttempts > 0 || waitingForCli;
+                waitingForCli = false;
+                reconnectAttempts = 0;
+                updateStatus('connected', t('status.connectedSince', { time: formatTime(lastConnectedAt) }));
+                safeFitTerminal();
+                sendResize();
+                terminal.focus();
+
+                if (recovered && hasConnectedToLiveSession) {
+                    writeSystemNotice(t('notices.recovered'), 'info');
+                }
+
+                wasRecovering = false;
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+                    handleTerminalMessage(message);
+                } catch (error) {
+                    console.error(copy.logs.parseMessageFailed, error, event.data);
+                }
+            };
+
+            ws.onerror = (error) => {
+                console.error(copy.logs.websocketError, error);
+            };
+
+            ws.onclose = () => {
+                ws = null;
+                if (manualDisconnect) {
+                    updateStatus('disconnected');
+                    return;
+                }
+                scheduleReconnect();
+            };
         }
 
-        // 用于跟踪是否收到过缓存消息
-        let hasReceivedCachedMessages = false;
-
-        function handleTerminalMessage(msg) {
-            // 处理第一个WebSocket消息：清理终端
-            if (!hasReceivedFirstMessage) {
-                terminal.reset(); // 清空终端
+        function handleTerminalMessage(message) {
+            if (message.type !== 'ping' && !hasReceivedFirstMessage) {
+                terminal.reset();
                 hasReceivedFirstMessage = true;
-                console.log('🧹 已清理终端，开始渲染WebSocket消息');
             }
 
-            switch (msg.type) {
-                case 'no_cli':
-                    // 没有CLI客户端连接，显示帮助信息
-                    terminal.reset(); // 清空终端
-                    displayNoCliMessage(msg.data);
-                    break;
-                case 'init':
-                    // 记录客户端操作系统类型（仅用于日志，不显示）
-                    clientOS = msg.os_info || 'unknown';
-                    console.log('💻 检测到客户端系统:', clientOS);
+            switch (message.type) {
+                case 'no_cli': {
+                    const alreadyWaiting = currentState === 'waiting-cli';
+                    waitingForCli = true;
+                    hasCliSessionForCurrentConnection = false;
+                    updateStatus(
+                        'waiting-cli',
+                        hasConnectedToLiveSession ? t('status.waitingCliPreserved') : t('status.waitingCliInitial')
+                    );
 
-                    // 不显示任何欢迎信息，只显示纯净的终端内容
-                    // 检查是否收到过缓存消息
-                    // 如果有缓存消息，说明已经有终端输出（包括提示符），不需要发送回车
-                    // 如果没有缓存消息，需要发送回车来触发显示提示符
+                    if (!hasConnectedToLiveSession) {
+                        displayNoCliMessage(message.data || '');
+                        showingNoCliScreen = true;
+                    } else if (!alreadyWaiting) {
+                        writeSystemNotice(t('notices.waitingCli'), 'warn');
+                    }
+                    break;
+                }
+                case 'init':
+                    clientOS = message.os_info || 'unknown';
+                    hasConnectedToLiveSession = true;
+                    markCliSessionAvailable();
+                    if (showingNoCliScreen) {
+                        terminal.reset();
+                        showingNoCliScreen = false;
+                    }
                     if (!hasReceivedCachedMessages) {
-                        // 发送回车符显示提示符（根据系统类型使用正确的换行符）
-                        setTimeout(() => {
-                            sendEnterKey();
-                        }, 500);
+                        window.setTimeout(sendEnterKey, 350);
                     }
                     break;
                 case 'output':
-                    if (msg.data && msg.data.length > 0) {
-                        // 标记已收到缓存消息
+                    if (message.data) {
+                        hasConnectedToLiveSession = true;
+                        markCliSessionAvailable();
+                        if (showingNoCliScreen) {
+                            terminal.reset();
+                            showingNoCliScreen = false;
+                        }
                         hasReceivedCachedMessages = true;
-                        terminal.write(msg.data);
+                        terminal.write(message.data);
                     }
                     break;
                 case 'input':
-                    // 输入回显（主要用于Windows管道模式下的本地输入）
-                    if (msg.data && msg.data.length > 0) {
-                        // 只在输入来自本地时回显，避免Web端重复回显
-                        if (msg.source === 'local') {
-                            terminal.write(msg.data);
-                        }
+                    if (message.data && message.source === 'local') {
+                        markCliSessionAvailable();
+                        terminal.write(message.data);
                     }
                     break;
-                case 'close':
-                    terminal.writeln('');
-                    if (msg.data && msg.data.includes('CLI客户端已断开')) {
-                        terminal.writeln('\x1b[31m❌ CLI客户端已断开连接\x1b[0m');
-                        terminal.writeln('');
-                        terminal.writeln('\x1b[33m⚠️  远程终端已关闭\x1b[0m');
-                        terminal.writeln('\x1b[36m💡 提示: 请确保CLI客户端正在运行\x1b[0m');
-                    } else {
-                        terminal.writeln('\x1b[31m❌ 会话已关闭\x1b[0m');
-                        if (msg.data) {
-                            terminal.writeln(`\x1b[90m${msg.data}\x1b[0m`);
-                        }
+                case 'close': {
+                    const alreadyWaiting = currentState === 'waiting-cli';
+                    waitingForCli = true;
+                    hasCliSessionForCurrentConnection = false;
+                    updateStatus('waiting-cli', t('status.waitingCliClosed'));
+                    if (!alreadyWaiting) {
+                        const isCliDisconnect = message.data && /CLI.*(已断开|disconnect)/i.test(message.data);
+                        writeSystemNotice(isCliDisconnect ? t('notices.cliDisconnected') : t('notices.sessionClosed'), 'warn');
                     }
-                    terminal.writeln('');
-                    disconnect();
                     break;
+                }
                 case 'ping':
-                    // 心跳消息，忽略
+                    break;
+                default:
                     break;
             }
         }
 
         function sendEnterKey() {
-            if (!ws || ws.readyState !== WebSocket.OPEN) {
+            if (!isSocketOpen()) {
                 return;
             }
 
-            // 根据客户端操作系统类型选择正确的换行符
-            let enterKey = '\r'; // 默认使用CR（Unix）
+            let enterKey = '\r';
             if (clientOS === 'windows') {
-                enterKey = '\r\n'; // Windows使用CRLF
+                enterKey = '\r\n';
             }
 
-            const enterMsg = {
+            sendJson({
                 type: 'input',
                 data: enterKey,
                 session: sessionId,
                 user_id: 'web'
-            };
-
-            ws.send(JSON.stringify(enterMsg));
-            console.log(`📤 发送初始回车符 (${clientOS}):`, JSON.stringify(enterKey));
+            });
         }
 
         function disconnect() {
-            if (ws) {
-                ws.close();
+            manualDisconnect = true;
+            waitingForCli = false;
+            hasCliSessionForCurrentConnection = false;
+            clearReconnectTimer();
+
+            if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+                ws.close(1000, 'manual disconnect');
+            } else {
                 ws = null;
+                updateStatus('disconnected');
             }
-            updateConnectionStatus('disconnected');
+        }
+
+        function reconnectNow() {
+            manualDisconnect = false;
+            waitingForCli = false;
+            reconnectAttempts = 0;
+            wasRecovering = true;
+            hasCliSessionForCurrentConnection = false;
+            clearReconnectTimer();
+
+            if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+                ws.onclose = null;
+                ws.close(1000, 'manual reconnect');
+            }
+            ws = null;
+            connectWebSocket('manual');
         }
 
         function displayNoCliMessage(message) {
-            // 清空终端并显示友好的帮助信息
-            terminal.writeln('\x1b[2J\x1b[H'); // 清屏并移动到首页
+            terminal.reset();
             terminal.writeln('');
-
-            // 标题
-            terminal.writeln('\x1b[1;33m╔═══════════════════════════════════════════════════════════════╗\x1b[0m');
-            terminal.writeln('\x1b[1;33m║\x1b[37m               ⚠️  CLI客户端未连接                              \x1b[33m║\x1b[0m');
-            terminal.writeln('\x1b[1;33m╠═══════════════════════════════════════════════════════════════╣\x1b[0m');
-            terminal.writeln('\x1b[1;33m║\x1b[0m \x1b[1;37m请先启动CLI客户端，然后再刷新此页面\x1b[0m                        \x1b[1;33m║\x1b[0m');
-            terminal.writeln('\x1b[1;33m╚═══════════════════════════════════════════════════════════════╝\x1b[0m');
+            terminal.writeln(`\x1b[1;33m${t('noCli.title')}\x1b[0m`);
             terminal.writeln('');
-
-            // 显示消息内容
+            copy.noCli.steps.forEach((step, index) => {
+                terminal.writeln(`\x1b[36m${index + 1}.\x1b[0m ${step}`);
+            });
             if (message) {
-                const lines = message.split('\n');
-                lines.forEach(line => {
-                    if (line.includes('⚠️')) {
-                        terminal.writeln(`\x1b[1;33m${line}\x1b[0m`);
-                    } else if (line.includes('💡')) {
-                        terminal.writeln(`\x1b[1;36m${line}\x1b[0m`);
-                    } else if (line.includes('📥')) {
-                        terminal.writeln(`\x1b[1;32m${line}\x1b[0m`);
-                    } else if (line.includes('./cligool') || line.includes('cligool-')) {
-                        // 高亮显示命令示例
-                        terminal.writeln(`\x1b[1;32m  ${line}\x1b[0m`);
-                    } else if (line.includes('命令') || line.includes('运行')) {
-                        terminal.writeln(`\x1b[1;37m${line}\x1b[0m`);
-                    } else if (line.includes('http')) {
-                        terminal.writeln(`\x1b[1;34m${line}\x1b[0m`);
-                    } else if (line.trim() !== '') {
-                        terminal.writeln(`  ${line}`);
+                terminal.writeln('');
+                message.split('\n').forEach((line) => {
+                    if (line.trim()) {
+                        terminal.writeln(`\x1b[90m${line}\x1b[0m`);
                     }
                 });
             }
-
             terminal.writeln('');
-            terminal.writeln('\x1b[1;36m💡 提示：\x1b[0m');
-            terminal.writeln('  1. 复制上面的命令到终端执行');
-            terminal.writeln('  2. 或者编辑 ~/.cligool.json 配置文件');
-            terminal.writeln('  3. 启动CLI客户端后刷新此页面');
-            terminal.writeln('');
-
-            // 添加"复制命令"功能提示
-            terminal.writeln('\x1b[1;37m─────────────────────────────────────────────────────────────\x1b[0m');
-            terminal.writeln('');
-
-            // 禁用终端输入（因为没有CLI连接）
-            terminal.writeln('\x1b[90m等待CLI客户端连接...\x1b[0m');
-            terminal.writeln('\x1b[90m(终端已禁用，请启动CLI客户端后刷新页面)\x1b[0m');
-            terminal.writeln('');
+            terminal.writeln(`\x1b[90m${t('noCli.waiting')}\x1b[0m`);
         }
 
-        function updateConnectionStatus(status) {
-            const statusEl = document.getElementById('connection-status');
-            const disconnectBtn = document.getElementById('disconnect-btn');
-
-            if (statusEl) {
-                statusEl.className = 'status ' + status;
-
-                switch (status) {
-                    case 'connected':
-                    statusEl.textContent = '已连接';
-                    disconnectBtn.style.display = 'block';
-                    break;
-                case 'connecting':
-                    statusEl.textContent = '连接中...';
-                    disconnectBtn.style.display = 'none';
-                    break;
-                case 'disconnected':
-                    statusEl.textContent = '未连接';
-                    disconnectBtn.style.display = 'none';
-                    break;
-                }
+        window.addEventListener('online', () => {
+            if (!manualDisconnect) {
+                reconnectNow();
             }
-        }
+        });
+
+        window.addEventListener('offline', () => {
+            if (!manualDisconnect) {
+                hasCliSessionForCurrentConnection = false;
+                clearReconnectTimer();
+                updateStatus('offline');
+            }
+        });
+
+        window.addEventListener('beforeunload', () => {
+            clearReconnectTimer();
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close(1000, 'page unload');
+            }
+        });
+
+        updateStatus('connecting');
+
+        window.addEventListener('load', () => {
+            if (typeof Terminal === 'undefined') {
+                document.getElementById('terminal').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-card">
+                            <h1>${copy.emptyState.resourcesTitle}</h1>
+                            <p>${copy.emptyState.resourcesBody}</p>
+                        </div>
+                    </div>
+                `;
+                updateStatus('failed', t('status.resourcesMissing'));
+                return;
+            }
+
+            try {
+                initTerminal();
+                elements.disconnectBtn.addEventListener('click', disconnect);
+                elements.manualReconnectBtn.addEventListener('click', reconnectNow);
+                elements.bannerAction.addEventListener('click', reconnectNow);
+                window.setTimeout(() => connectWebSocket('initial'), 250);
+            } catch (error) {
+                console.error(copy.logs.terminalInitFailed, error);
+                document.getElementById('terminal').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-card">
+                            <h1>${copy.emptyState.initTitle}</h1>
+                            <p>${String(error.message || error)}</p>
+                        </div>
+                    </div>
+                `;
+                updateStatus('failed', t('status.initFailed'));
+            }
+        });
     </script>
 </body>
 </html>
