@@ -5,7 +5,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
 
@@ -64,5 +66,149 @@ func TestSendCachedMessagesClearsCacheAfterSuccessfulDelivery(t *testing.T) {
 	}
 	if session.TotalCacheSize != 0 {
 		t.Fatalf("expected cache size to reset, got %d", session.TotalCacheSize)
+	}
+}
+
+func TestWebClientWithoutCliStaysConnectedAndReceivesInit(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	service := NewService(Config{})
+	router := gin.New()
+	router.GET("/api/terminal/:session_id", service.HandleTerminalConnection)
+
+	server := httptest.NewServer(router)
+	defer server.Close()
+
+	wsBaseURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	sessionID := "waiting-web-session"
+
+	webConn, _, err := websocket.DefaultDialer.Dial(wsBaseURL+"/api/terminal/"+sessionID+"?type=web&user_id=web-1", nil)
+	if err != nil {
+		t.Fatalf("dial web failed: %v", err)
+	}
+	defer webConn.Close()
+
+	webConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+
+	var noCli TerminalMessage
+	if err := webConn.ReadJSON(&noCli); err != nil {
+		t.Fatalf("read no_cli failed: %v", err)
+	}
+	if noCli.Type != "no_cli" {
+		t.Fatalf("expected no_cli message, got %+v", noCli)
+	}
+
+	cliConn, _, err := websocket.DefaultDialer.Dial(wsBaseURL+"/api/terminal/"+sessionID+"?type=client&user_id=client", nil)
+	if err != nil {
+		t.Fatalf("dial cli failed: %v", err)
+	}
+	defer cliConn.Close()
+
+	initMsg := TerminalMessage{
+		Type:       "init",
+		Session:    sessionID,
+		UserID:     "client",
+		WorkingDir: "/tmp",
+		OSInfo:     "unix",
+	}
+	if err := cliConn.WriteJSON(initMsg); err != nil {
+		t.Fatalf("write init failed: %v", err)
+	}
+
+	webConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+
+	var receivedInit TerminalMessage
+	if err := webConn.ReadJSON(&receivedInit); err != nil {
+		t.Fatalf("read init after cli connect failed: %v", err)
+	}
+	if receivedInit.Type != "init" || receivedInit.OSInfo != "unix" || receivedInit.WorkingDir != "/tmp" {
+		t.Fatalf("unexpected init after cli connect: %+v", receivedInit)
+	}
+}
+
+func TestCliDisconnectDoesNotCloseWebClientConnection(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	service := NewService(Config{})
+	router := gin.New()
+	router.GET("/api/terminal/:session_id", service.HandleTerminalConnection)
+
+	server := httptest.NewServer(router)
+	defer server.Close()
+
+	wsBaseURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	sessionID := "disconnect-web-session"
+
+	cliConn, _, err := websocket.DefaultDialer.Dial(wsBaseURL+"/api/terminal/"+sessionID+"?type=client&user_id=client", nil)
+	if err != nil {
+		t.Fatalf("dial cli failed: %v", err)
+	}
+
+	webConn, _, err := websocket.DefaultDialer.Dial(wsBaseURL+"/api/terminal/"+sessionID+"?type=web&user_id=web-1", nil)
+	if err != nil {
+		t.Fatalf("dial web failed: %v", err)
+	}
+	defer webConn.Close()
+
+	firstInit := TerminalMessage{
+		Type:       "init",
+		Session:    sessionID,
+		UserID:     "client",
+		WorkingDir: "/tmp/first",
+		OSInfo:     "unix",
+	}
+	if err := cliConn.WriteJSON(firstInit); err != nil {
+		t.Fatalf("write first init failed: %v", err)
+	}
+
+	webConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+
+	var initialWebInit TerminalMessage
+	if err := webConn.ReadJSON(&initialWebInit); err != nil {
+		t.Fatalf("read first init failed: %v", err)
+	}
+	if initialWebInit.Type != "init" || initialWebInit.WorkingDir != "/tmp/first" {
+		t.Fatalf("unexpected first init: %+v", initialWebInit)
+	}
+
+	if err := cliConn.Close(); err != nil {
+		t.Fatalf("close cli failed: %v", err)
+	}
+
+	webConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+
+	var closeMsg TerminalMessage
+	if err := webConn.ReadJSON(&closeMsg); err != nil {
+		t.Fatalf("read cli disconnect notification failed: %v", err)
+	}
+	if closeMsg.Type != "close" {
+		t.Fatalf("expected close notification, got %+v", closeMsg)
+	}
+
+	cliReconnect, _, err := websocket.DefaultDialer.Dial(wsBaseURL+"/api/terminal/"+sessionID+"?type=client&user_id=client", nil)
+	if err != nil {
+		t.Fatalf("dial reconnect cli failed: %v", err)
+	}
+	defer cliReconnect.Close()
+
+	secondInit := TerminalMessage{
+		Type:       "init",
+		Session:    sessionID,
+		UserID:     "client",
+		WorkingDir: "/tmp/second",
+		OSInfo:     "windows",
+	}
+	if err := cliReconnect.WriteJSON(secondInit); err != nil {
+		t.Fatalf("write second init failed: %v", err)
+	}
+
+	webConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+
+	var reconnectedInit TerminalMessage
+	if err := webConn.ReadJSON(&reconnectedInit); err != nil {
+		t.Fatalf("read init after cli reconnect failed: %v", err)
+	}
+	if reconnectedInit.Type != "init" || reconnectedInit.WorkingDir != "/tmp/second" || reconnectedInit.OSInfo != "windows" {
+		t.Fatalf("unexpected init after cli reconnect: %+v", reconnectedInit)
 	}
 }

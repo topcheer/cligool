@@ -1410,6 +1410,40 @@
             syncLiveTerminalMode();
         }
 
+        function activateCliSession() {
+            const hadLiveSessionBefore = hasConnectedToLiveSession;
+            const wasWaitingForCliState = waitingForCli || currentState === 'waiting-cli';
+            const shouldRefreshConnectedUi =
+                currentState !== 'connected' ||
+                !hasCliSessionForCurrentConnection ||
+                waitingForCli;
+
+            waitingForCli = false;
+            hasConnectedToLiveSession = true;
+            markCliSessionAvailable();
+
+            if (showingNoCliScreen) {
+                terminal.reset();
+                showingNoCliScreen = false;
+            }
+
+            if (!shouldRefreshConnectedUi) {
+                return;
+            }
+
+            lastConnectedAt = new Date();
+            reconnectAttempts = 0;
+            updateStatus('connected', t('status.connectedSince', { time: formatTime(lastConnectedAt) }));
+            safeFitTerminal();
+            sendResize();
+            terminal.focus();
+            wasRecovering = false;
+
+            if (wasWaitingForCliState && hadLiveSessionBefore) {
+                writeSystemNotice(t('notices.recovered'), 'info');
+            }
+        }
+
         function writeSystemNotice(message, tone) {
             if (!terminal || !message) {
                 return;
@@ -1629,21 +1663,11 @@
                 }
                 case 'init':
                     clientOS = message.os_info || 'unknown';
-                    hasConnectedToLiveSession = true;
-                    markCliSessionAvailable();
-                    if (showingNoCliScreen) {
-                        terminal.reset();
-                        showingNoCliScreen = false;
-                    }
+                    activateCliSession();
                     break;
                 case 'output':
                     if (message.data) {
-                        hasConnectedToLiveSession = true;
-                        markCliSessionAvailable();
-                        if (showingNoCliScreen) {
-                            terminal.reset();
-                            showingNoCliScreen = false;
-                        }
+                        activateCliSession();
                         terminal.write(message.data);
                     }
                     break;

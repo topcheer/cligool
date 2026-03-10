@@ -51,7 +51,7 @@ type Session struct {
 	ClientCon        *websocket.Conn            // CLI客户端连接
 	Mutex            sync.RWMutex
 	Active           bool
-	LastPing         time.Time       // 最后一次收到ping的时间
+	LastPingByPeer   map[string]time.Time
 	WorkingDirectory string          // 客户端当前工作目录
 	OSInfo           string          // 客户端操作系统信息
 	MessageCache     []CachedMessage // CLI消息缓存（当无Web客户端时）
@@ -117,7 +117,7 @@ func (s *Service) HandleTerminalConnection(c *gin.Context) {
 		session.Mutex.Lock()
 		session.ClientCon = conn
 		session.Active = true
-		session.LastPing = time.Now()
+		session.LastPingByPeer["client"] = time.Now()
 		session.Mutex.Unlock()
 
 		log.Printf("CLI client connected to session: %s", sessionID)
@@ -131,6 +131,7 @@ func (s *Service) HandleTerminalConnection(c *gin.Context) {
 		// Web客户端连接
 		session.Mutex.Lock()
 		session.Clients[userID] = conn
+		session.LastPingByPeer[userID] = time.Now()
 		session.Mutex.Unlock()
 
 		log.Printf("Web client connected to session: %s, user: %s", sessionID, userID)
@@ -147,7 +148,7 @@ func (s *Service) HandleTerminalConnection(c *gin.Context) {
 			// 没有CLI客户端连接，发送提示消息
 			log.Printf("⚠️  Web客户端连接但无CLI客户端，发送提示消息")
 			s.sendNoCliClientMessage(session, conn)
-			// 注意：不要调用 handleWebClient，因为已经发送了提示消息
+			s.handleWebClient(session, userID)
 			return
 		}
 
@@ -330,16 +331,20 @@ func buildNoCliHintMessage(sessionID string) string {
 
 // notifyWebClientsClientDisconnected 通知所有Web客户端CLI已断开
 func (s *Service) notifyWebClientsClientDisconnected(session *Session) {
-	session.Mutex.Lock()
-	defer session.Mutex.Unlock()
-
+	session.Mutex.RLock()
 	webClientCount := len(session.Clients)
 	if webClientCount == 0 {
+		session.Mutex.RUnlock()
 		log.Printf("📭 没有Web客户端需要通知")
 		return
 	}
+	clients := make(map[string]*websocket.Conn, webClientCount)
+	for userID, conn := range session.Clients {
+		clients[userID] = conn
+	}
+	session.Mutex.RUnlock()
 
-	log.Printf("📡 通知 %d 个Web客户端: CLI已断开", webClientCount)
+	log.Printf("📡 通知 %d 个Web客户端: CLI已断开，保持Web连接等待CLI恢复", webClientCount)
 
 	// 创建关闭消息
 	closeMsg := TerminalMessage{
@@ -349,21 +354,14 @@ func (s *Service) notifyWebClientsClientDisconnected(session *Session) {
 	}
 	jsonData, _ := json.Marshal(closeMsg)
 
-	// 向所有Web客户端发送关闭消息
-	for userID, conn := range session.Clients {
+	// 向所有Web客户端发送关闭消息，但保持WebSocket连接不断开
+	for userID, conn := range clients {
 		if err := conn.WriteMessage(websocket.TextMessage, jsonData); err != nil {
 			log.Printf("❌ 发送关闭消息失败给Web客户端 %s: %v", userID, err)
 		} else {
-			log.Printf("✅ 已通知Web客户端: %s", userID)
+			log.Printf("✅ 已通知Web客户端进入等待CLI状态: %s", userID)
 		}
-
-		// 关闭Web客户端连接
-		conn.Close()
 	}
-
-	// 清空Web客户端列表
-	session.Clients = make(map[string]*websocket.Conn)
-	log.Printf("🧹 已清理所有Web客户端连接")
 }
 
 // handleClientConnection 处理CLI客户端连接
@@ -407,6 +405,7 @@ func (s *Service) handleClientConnection(session *Session) {
 	session.Mutex.Lock()
 	session.ClientCon = nil
 	session.Active = false
+	delete(session.LastPingByPeer, "client")
 	session.Mutex.Unlock()
 }
 
@@ -445,6 +444,7 @@ func (s *Service) handleWebClient(session *Session, userID string) {
 	// 清理连接
 	session.Mutex.Lock()
 	delete(session.Clients, userID)
+	delete(session.LastPingByPeer, userID)
 	session.Mutex.Unlock()
 }
 
@@ -493,6 +493,7 @@ func (s *Service) getOrCreateSession(sessionID, owner string) *Session {
 		UpdatedAt:      time.Now(),
 		Owner:          owner,
 		Clients:        make(map[string]*websocket.Conn),
+		LastPingByPeer: make(map[string]time.Time),
 		Active:         false,
 		MessageCache:   make([]CachedMessage, 0, 1000), // 预分配1000条容量
 		CacheSizeLimit: 1000,                           // 最多缓存1000条消息
@@ -509,7 +510,7 @@ func (s *Service) setupPingHandler(conn *websocket.Conn, session *Session, peerI
 	// 设置pong handler来更新最后活跃时间
 	conn.SetPongHandler(func(appData string) error {
 		session.Mutex.Lock()
-		session.LastPing = time.Now()
+		session.LastPingByPeer[peerID] = time.Now()
 		session.Mutex.Unlock()
 		log.Printf("💓 收到 %s 的pong", peerID)
 		return nil
@@ -519,7 +520,7 @@ func (s *Service) setupPingHandler(conn *websocket.Conn, session *Session, peerI
 	go s.startHeartbeat(conn, session, peerID)
 
 	// 启动超时检测
-	go s.monitorHeartbeat(session, peerID)
+	go s.monitorHeartbeat(conn, session, peerID)
 }
 
 // startHeartbeat 定期发送ping
@@ -530,16 +531,12 @@ func (s *Service) startHeartbeat(conn *websocket.Conn, session *Session, peerID 
 	for {
 		select {
 		case <-ticker.C:
-			session.Mutex.RLock()
-			isActive := session.Active && session.ClientCon != nil
-			session.Mutex.RUnlock()
-
-			if !isActive {
+			if !s.isPeerConnected(session, peerID, conn) {
 				log.Printf("🔌 连接已关闭，停止心跳: %s", peerID)
 				return
 			}
 
-			if err := conn.WriteMessage(websocket.PingMessage, []byte("heartbeat")); err != nil {
+			if err := conn.WriteControl(websocket.PingMessage, []byte("heartbeat"), time.Now().Add(5*time.Second)); err != nil {
 				log.Printf("❌ 发送ping失败到 %s: %v", peerID, err)
 				return
 			}
@@ -549,14 +546,21 @@ func (s *Service) startHeartbeat(conn *websocket.Conn, session *Session, peerID 
 }
 
 // monitorHeartbeat 监控心跳超时
-func (s *Service) monitorHeartbeat(session *Session, peerID string) {
+func (s *Service) monitorHeartbeat(conn *websocket.Conn, session *Session, peerID string) {
 	ticker := time.NewTicker(15 * time.Second) // 每15秒检查一次
 	defer ticker.Stop()
 
 	for range ticker.C {
 		session.Mutex.RLock()
-		lastPing := session.LastPing
+		lastPing, ok := session.LastPingByPeer[peerID]
 		session.Mutex.RUnlock()
+		if !ok {
+			return
+		}
+
+		if !s.isPeerConnected(session, peerID, conn) {
+			return
+		}
 
 		// 如果超过90秒没有收到pong，认为连接已死
 		if time.Since(lastPing) > 90*time.Second {
@@ -564,16 +568,30 @@ func (s *Service) monitorHeartbeat(session *Session, peerID string) {
 				peerID, time.Since(lastPing))
 
 			session.Mutex.Lock()
-			if peerID == "client" && session.ClientCon != nil {
+			if peerID == "client" && session.ClientCon == conn {
 				session.ClientCon.Close()
 				session.ClientCon = nil
 				session.Active = false
-			} else if conn, ok := session.Clients[peerID]; ok {
-				conn.Close()
+				delete(session.LastPingByPeer, peerID)
+			} else if currentConn, ok := session.Clients[peerID]; ok && currentConn == conn {
+				currentConn.Close()
 				delete(session.Clients, peerID)
+				delete(session.LastPingByPeer, peerID)
 			}
 			session.Mutex.Unlock()
 			return
 		}
 	}
+}
+
+func (s *Service) isPeerConnected(session *Session, peerID string, conn *websocket.Conn) bool {
+	session.Mutex.RLock()
+	defer session.Mutex.RUnlock()
+
+	if peerID == "client" {
+		return session.ClientCon == conn
+	}
+
+	currentConn, ok := session.Clients[peerID]
+	return ok && currentConn == conn
 }
