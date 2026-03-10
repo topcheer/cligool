@@ -24,11 +24,13 @@ type websocketWriter struct {
 	conn          *websocket.Conn
 	requests      chan websocketWriteRequest
 	done          chan struct{}
+	errors        chan error
 	writerStop    chan struct{}
 	heartbeatStop chan struct{}
 	closing       atomic.Bool
 	stopOnce      sync.Once
 	heartbeatOnce sync.Once
+	errorOnce     sync.Once
 }
 
 func newWebsocketWriter(conn *websocket.Conn) *websocketWriter {
@@ -36,12 +38,14 @@ func newWebsocketWriter(conn *websocket.Conn) *websocketWriter {
 		conn:          conn,
 		requests:      make(chan websocketWriteRequest, 100),
 		done:          make(chan struct{}),
+		errors:        make(chan error, 1),
 		writerStop:    make(chan struct{}),
 		heartbeatStop: make(chan struct{}),
 	}
 
 	go func() {
 		defer close(w.done)
+		defer w.closeErrors()
 
 		for {
 			select {
@@ -52,6 +56,7 @@ func newWebsocketWriter(conn *websocket.Conn) *websocketWriter {
 					close(req.ack)
 				}
 				if err != nil {
+					w.signalError(err)
 					if shouldLogWebSocketError(err) {
 						log.Printf("❌ WebSocket写入失败: %v", err)
 					}
@@ -109,6 +114,9 @@ func (w *websocketWriter) enqueue(req websocketWriteRequest) error {
 func (w *websocketWriter) StartHeartbeat() {
 	w.conn.SetPingHandler(func(appData string) error {
 		err := w.conn.WriteControl(websocket.PongMessage, []byte(appData), time.Now().Add(5*time.Second))
+		if err != nil {
+			w.signalError(err)
+		}
 		if shouldLogWebSocketError(err) {
 			log.Printf("❌ 发送pong失败: %v", err)
 		}
@@ -127,6 +135,9 @@ func (w *websocketWriter) StartHeartbeat() {
 			select {
 			case <-ticker.C:
 				err := w.conn.WriteControl(websocket.PingMessage, []byte("heartbeat"), time.Now().Add(5*time.Second))
+				if err != nil {
+					w.signalError(err)
+				}
 				if shouldLogWebSocketError(err) {
 					log.Printf("❌ 发送ping失败: %v", err)
 				}
@@ -146,6 +157,10 @@ func (w *websocketWriter) StopHeartbeat() {
 	})
 }
 
+func (w *websocketWriter) Errors() <-chan error {
+	return w.errors
+}
+
 func (w *websocketWriter) Shutdown() {
 	w.stopOnce.Do(func() {
 		w.closing.Store(true)
@@ -160,6 +175,23 @@ func (w *websocketWriter) Shutdown() {
 		if err := w.conn.Close(); shouldLogWebSocketError(err) {
 			log.Printf("❌ 关闭WebSocket连接失败: %v", err)
 		}
+	})
+}
+
+func (w *websocketWriter) signalError(err error) {
+	if err == nil {
+		return
+	}
+
+	w.errorOnce.Do(func() {
+		w.errors <- err
+		close(w.errors)
+	})
+}
+
+func (w *websocketWriter) closeErrors() {
+	w.errorOnce.Do(func() {
+		close(w.errors)
 	})
 }
 

@@ -6,7 +6,6 @@ package main
 import (
 	"bytes"
 	"crypto/tls"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -405,7 +404,7 @@ func (pc *pseudoConsole) resize(cols, rows int16) error {
 }
 
 // monitorWindowSize 监控窗口大小变化
-func monitorWindowSize(pc *pseudoConsole, stopChan chan struct{}) {
+func monitorWindowSize(pc *pseudoConsole, stopChan chan struct{}, onResize func(cols, rows int16)) {
 	// 保存上一次的大小
 	var lastCols, lastRows int16 = -1, -1
 
@@ -426,6 +425,9 @@ func monitorWindowSize(pc *pseudoConsole, stopChan chan struct{}) {
 			// 如果大小变化，调整 ConPTY
 			if cols != lastCols || rows != lastRows {
 				pc.resize(cols, rows)
+				if onResize != nil {
+					onResize(cols, rows)
+				}
 				lastCols = cols
 				lastRows = rows
 			}
@@ -537,11 +539,14 @@ func printHeader(sessionID, serverURL, proxyURL string) {
 func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, commandPath string, cmdArgs []string, noBrowser bool) error {
 	log.Println("开始建立WebSocket连接...")
 
-	// 建立 WebSocket 连接
-	wsURL, _ := buildWebSocketURL(serverURL, sessionID)
+	// 建立 WebSocket 连接参数
+	wsURL, err := buildWebSocketURL(serverURL, sessionID)
+	if err != nil {
+		return fmt.Errorf("构建WebSocket URL失败: %w", err)
+	}
 
 	// 创建拨号器
-	dialer := websocket.DefaultDialer
+	dialer := *websocket.DefaultDialer
 	dialer.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 
 	// 如果配置了代理，使用代理拨号器
@@ -556,17 +561,21 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 
 	log.Println("WebSocket URL:", wsURL)
 
-	conn, _, err := dialer.Dial(wsURL, nil)
-	if err != nil {
-		return fmt.Errorf("WebSocket连接失败: %w", err)
+	dialRelay := func() (*websocket.Conn, error) {
+		conn, _, err := dialer.Dial(wsURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		return conn, nil
 	}
-
-	wsWriter := newWebsocketWriter(conn)
 
 	// 确保在退出时总是通知 relay 服务器
 	var sessionError error
+	var relayClient *relayConnectionManager
 	defer func() {
-		wsWriter.StopHeartbeat()
+		if relayClient == nil {
+			return
+		}
 
 		// 发送关闭消息
 		closeMsg := TerminalMessage{
@@ -583,70 +592,10 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 			log.Printf("✅ 发送正常关闭消息")
 		}
 
-		jsonData, _ := json.Marshal(closeMsg)
-		if err := wsWriter.WriteWithTimeout(jsonData, 2*time.Second); shouldLogWebSocketError(err) {
-			log.Printf("❌ 发送关闭消息失败: %v", err)
-		}
-
-		wsWriter.Shutdown()
+		relayClient.Shutdown(&closeMsg)
 	}()
-
-	log.Println("WebSocket已连接")
-	fmt.Println("已连接到中继服务器")
-	fmt.Println("现在可以在Web终端中输入命令了")
 	fmt.Println("Windows模式：使用ConPTY，支持完整终端特性")
 	fmt.Println()
-
-	// 发送系统通知并自动打开浏览器（除非用户指定 -no-browser）
-	if !noBrowser {
-		cleanURL := strings.TrimSuffix(serverURL, "/")
-		webURL := fmt.Sprintf("%s/session/%s", cleanURL, sessionID)
-
-		// Windows: 使用简单的方法打开浏览器
-		go func() {
-			// 方法1: 使用 rundll32 打开 URL
-			cmd := exec.Command("rundll32", "url.dll,FileProtocolHandler", webURL)
-			if err := cmd.Run(); err != nil {
-				// 方法2: 降级到 cmd start
-				exec.Command("cmd", "/c", "start", "", webURL).Run()
-			}
-		}()
-
-		// 可选：显示简单的 Toast 通知（Windows 10+）
-		go func() {
-			// 使用 PowerShell 的 BurntToast 模块（如果可用）
-			psScript := fmt.Sprintf(
-				`try { Import-Module BurntToast; New-BurntToastNotification -Title '🌐 CliGool Web 终端' -Message '%s' } catch {}`,
-				webURL,
-			)
-			exec.Command("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", psScript).Run()
-		}()
-
-		log.Printf("✅ 已在浏览器中打开: %s", webURL)
-		fmt.Println("📱 已发送系统通知并在浏览器中打开 Web 终端")
-	}
-	fmt.Println()
-
-	// 创建串行化 WebSocket 写入器，避免并发写入
-	wsWriter.StartHeartbeat()
-
-	// 发送初始化消息（工作目录和系统信息）
-	wd, _ := os.Getwd()
-	initMsg := TerminalMessage{
-		Type:       "init",
-		Session:    sessionID,
-		UserID:     "client",
-		WorkingDir: wd,
-		OSInfo:     "windows",
-		Rows:       rows,
-		Cols:       cols,
-	}
-	jsonData, _ := json.Marshal(initMsg)
-	if err := wsWriter.Write(jsonData); err != nil {
-		sessionError = fmt.Errorf("发送初始化消息失败: %w", err)
-		return sessionError
-	}
-	log.Printf("已发送初始化消息: 工作目录=%s, 大小=%dx%d", wd, cols, rows)
 
 	// 创建ConPTY
 	log.Println("创建ConPTY...")
@@ -778,11 +727,6 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 
 	log.Printf("命令已启动: %s, PID: %d", appPath, pi.ProcessId)
 
-	// 启动窗口大小监控
-	stopMonitor := make(chan struct{})
-	go monitorWindowSize(pc, stopMonitor)
-	defer close(stopMonitor)
-
 	// 设置标准输入为原始模式
 	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
 	if err != nil {
@@ -790,6 +734,101 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 	} else {
 		defer term.Restore(int(os.Stdin.Fd()), oldState)
 	}
+
+	wd, _ := os.Getwd()
+	cleanURL := strings.TrimSuffix(serverURL, "/")
+	webURL := fmt.Sprintf("%s/session/%s", cleanURL, sessionID)
+	relayClient = newRelayConnectionManager(relayConnectionConfig{
+		Dial: dialRelay,
+		InitMessage: TerminalMessage{
+			Type:       "init",
+			Session:    sessionID,
+			UserID:     "client",
+			WorkingDir: wd,
+			OSInfo:     "windows",
+			Rows:       rows,
+			Cols:       cols,
+		},
+		InboundHandler: func(msg TerminalMessage) {
+			switch msg.Type {
+			case "input":
+				if msg.Data == "" {
+					return
+				}
+				if _, err := pc.write([]byte(msg.Data)); err != nil {
+					log.Printf("ConPTY写入失败（Web输入）: %v", err)
+				}
+			case "resize":
+				if msg.Rows <= 0 || msg.Cols <= 0 {
+					return
+				}
+				if err := pc.resize(int16(msg.Cols), int16(msg.Rows)); err != nil {
+					log.Printf("ConPTY窗口大小调整失败（Web输入）: %v", err)
+				}
+			}
+		},
+		OnConnected: func(reconnected bool) {
+			if reconnected {
+				log.Println("✅ 已重新连接到中继服务器")
+				fmt.Println("已重新连接到中继服务器")
+				return
+			}
+
+			log.Println("WebSocket已连接")
+			fmt.Println("已连接到中继服务器")
+			fmt.Println("现在可以在Web终端中输入命令了")
+
+			if !noBrowser {
+				go func() {
+					cmd := exec.Command("rundll32", "url.dll,FileProtocolHandler", webURL)
+					if err := cmd.Run(); err != nil {
+						exec.Command("cmd", "/c", "start", "", webURL).Run()
+					}
+				}()
+
+				go func() {
+					psScript := fmt.Sprintf(
+						`try { Import-Module BurntToast; New-BurntToastNotification -Title '🌐 CliGool Web 终端' -Message '%s' } catch {}`,
+						webURL,
+					)
+					exec.Command("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", psScript).Run()
+				}()
+
+				log.Printf("✅ 已在浏览器中打开: %s", webURL)
+				fmt.Println("📱 已发送系统通知并在浏览器中打开 Web 终端")
+			}
+			fmt.Println()
+		},
+		OnDisconnected: func(hadConnectedBefore bool, err error) {
+			if hadConnectedBefore {
+				message := fmt.Sprintf("⚠️ 与中继服务器连接已断开（%v），正在自动重试并缓冲未发送消息", err)
+				log.Println(message)
+				fmt.Println(message)
+				return
+			}
+
+			message := fmt.Sprintf("⚠️ 暂时无法连接到中继服务器（%v），正在自动重试并缓冲未发送消息", err)
+			log.Println(message)
+			fmt.Println(message)
+		},
+	})
+	relayClient.Start()
+
+	// 启动窗口大小监控
+	stopMonitor := make(chan struct{})
+	go monitorWindowSize(pc, stopMonitor, func(cols, rows int16) {
+		msg := TerminalMessage{
+			Type:    "resize",
+			Rows:    int(rows),
+			Cols:    int(cols),
+			Session: sessionID,
+			UserID:  "client",
+		}
+		if err := relayClient.Send(msg); shouldLogRelaySendError(err) {
+			log.Printf("发送终端大小失败: %v", err)
+		}
+	})
+	defer close(stopMonitor)
 
 	// 本地终端输入 -> ConPTY
 	go func() {
@@ -812,26 +851,6 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 			// 写入ConPTY
 			if _, writeErr := pc.write(data); writeErr != nil {
 				continue
-			}
-		}
-	}()
-
-	// WebSocket -> ConPTY (网页输入写入ConPTY)
-	go func() {
-		for {
-			_, message, err := conn.ReadMessage()
-			if err != nil {
-				return
-			}
-
-			var msg TerminalMessage
-			if err := json.Unmarshal(message, &msg); err != nil {
-				continue
-			}
-
-			if msg.Type == "input" && msg.Data != "" {
-				data := []byte(msg.Data)
-				pc.write(data)
 			}
 		}
 	}()
@@ -868,8 +887,7 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 			UserID:  "client",
 		}
 
-		jsonData, _ := json.Marshal(msg)
-		if err := wsWriter.Write(jsonData); shouldLogWebSocketError(err) {
+		if err := relayClient.Send(msg); shouldLogRelaySendError(err) {
 			log.Printf("发送终端输出失败: %v", err)
 		}
 	}

@@ -5,7 +5,6 @@ package main
 
 import (
 	"crypto/tls"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -18,7 +17,6 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/creack/pty"
 	"github.com/google/uuid"
@@ -133,11 +131,14 @@ func printHeader(sessionID, serverURL, proxyURL string) {
 }
 
 func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, commandPath string, cmdArgs []string, noBrowser bool) error {
-	// 建立 WebSocket 连接
-	wsURL, _ := buildWebSocketURL(serverURL, sessionID)
+	// 建立 WebSocket 连接参数
+	wsURL, err := buildWebSocketURL(serverURL, sessionID)
+	if err != nil {
+		return fmt.Errorf("构建WebSocket URL失败: %w", err)
+	}
 
 	// 创建拨号器
-	dialer := websocket.DefaultDialer
+	dialer := *websocket.DefaultDialer
 	dialer.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 
 	// 如果配置了代理，使用代理拨号器
@@ -150,17 +151,21 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 		log.Printf("✅ 已配置代理: %s", proxyURL)
 	}
 
-	conn, _, err := dialer.Dial(wsURL, nil)
-	if err != nil {
-		return fmt.Errorf("WebSocket连接失败: %w", err)
+	dialRelay := func() (*websocket.Conn, error) {
+		conn, _, err := dialer.Dial(wsURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		return conn, nil
 	}
-
-	wsWriter := newWebsocketWriter(conn)
 
 	// 确保在退出时总是通知 relay 服务器
 	var sessionError error
+	var relayClient *relayConnectionManager
 	defer func() {
-		wsWriter.StopHeartbeat()
+		if relayClient == nil {
+			return
+		}
 
 		// 发送关闭消息
 		closeMsg := TerminalMessage{
@@ -177,49 +182,8 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 			log.Printf("✅ 发送正常关闭消息")
 		}
 
-		jsonData, _ := json.Marshal(closeMsg)
-		if err := wsWriter.WriteWithTimeout(jsonData, 2*time.Second); shouldLogWebSocketError(err) {
-			log.Printf("❌ 发送关闭消息失败: %v", err)
-		}
-
-		wsWriter.Shutdown()
+		relayClient.Shutdown(&closeMsg)
 	}()
-
-	log.Println("✅ WebSocket已连接")
-	fmt.Println("✅ 已连接到中继服务器")
-	fmt.Println("💡 现在可以在Web终端中输入命令了")
-
-	// 发送系统通知并自动打开浏览器（除非用户指定 -no-browser）
-	if !noBrowser {
-		cleanURL := strings.TrimSuffix(serverURL, "/")
-		webURL := fmt.Sprintf("%s/session/%s", cleanURL, sessionID)
-		notifier := NewSystemNotifier()
-		if err := notifier.SendWebTerminalNotification(webURL); err == nil {
-			fmt.Println("📱 已发送系统通知并在浏览器中打开 Web 终端")
-		}
-	}
-	fmt.Println()
-
-	// 创建串行化 WebSocket 写入器，避免并发写入
-	wsWriter.StartHeartbeat()
-
-	// 发送初始化消息（工作目录和系统信息）
-	wd, _ := os.Getwd()
-	initMsg := TerminalMessage{
-		Type:       "init",
-		Session:    sessionID,
-		UserID:     "client",
-		WorkingDir: wd,
-		OSInfo:     "unix",
-		Rows:       rows,
-		Cols:       cols,
-	}
-	jsonData, _ := json.Marshal(initMsg)
-	if err := wsWriter.Write(jsonData); err != nil {
-		sessionError = fmt.Errorf("发送初始化消息失败: %w", err)
-		return sessionError
-	}
-	log.Printf("✅ 已发送初始化消息: 工作目录=%s, 大小=%dx%d", wd, cols, rows)
 
 	// 创建 PTY
 	var command *exec.Cmd
@@ -297,6 +261,76 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 		log.Printf("设置PTY窗口大小失败: %v", err)
 	}
 
+	// 在本地终端启动后再连接 relay，这样即使 relay 暂时不可用也能继续本地运行
+	wd, _ := os.Getwd()
+	cleanURL := strings.TrimSuffix(serverURL, "/")
+	webURL := fmt.Sprintf("%s/session/%s", cleanURL, sessionID)
+	relayClient = newRelayConnectionManager(relayConnectionConfig{
+		Dial: dialRelay,
+		InitMessage: TerminalMessage{
+			Type:       "init",
+			Session:    sessionID,
+			UserID:     "client",
+			WorkingDir: wd,
+			OSInfo:     "unix",
+			Rows:       rows,
+			Cols:       cols,
+		},
+		InboundHandler: func(msg TerminalMessage) {
+			switch msg.Type {
+			case "input":
+				if msg.Data == "" {
+					return
+				}
+				if _, err := ptmx.Write([]byte(msg.Data)); err != nil {
+					log.Printf("PTY写入失败（Web输入）: %v", err)
+				}
+			case "resize":
+				if msg.Rows <= 0 || msg.Cols <= 0 {
+					return
+				}
+				if err := pty.Setsize(ptmx, &pty.Winsize{
+					Rows: uint16(msg.Rows),
+					Cols: uint16(msg.Cols),
+				}); err != nil {
+					log.Printf("PTY窗口大小调整失败（Web输入）: %v", err)
+				}
+			}
+		},
+		OnConnected: func(reconnected bool) {
+			if reconnected {
+				log.Println("✅ 已重新连接到中继服务器")
+				fmt.Println("✅ 已重新连接到中继服务器")
+				return
+			}
+
+			log.Println("✅ WebSocket已连接")
+			fmt.Println("✅ 已连接到中继服务器")
+			fmt.Println("💡 现在可以在Web终端中输入命令了")
+
+			if !noBrowser {
+				notifier := NewSystemNotifier()
+				if err := notifier.SendWebTerminalNotification(webURL); err == nil {
+					fmt.Println("📱 已发送系统通知并在浏览器中打开 Web 终端")
+				}
+			}
+			fmt.Println()
+		},
+		OnDisconnected: func(hadConnectedBefore bool, err error) {
+			if hadConnectedBefore {
+				message := fmt.Sprintf("⚠️ 与中继服务器连接已断开（%v），正在自动重试并缓冲未发送消息", err)
+				log.Println(message)
+				fmt.Println(message)
+				return
+			}
+
+			message := fmt.Sprintf("⚠️ 暂时无法连接到中继服务器（%v），正在自动重试并缓冲未发送消息", err)
+			log.Println(message)
+			fmt.Println(message)
+		},
+	})
+	relayClient.Start()
+
 	// 处理窗口大小变化
 	handleResize := func() {
 		// 从标准输入获取当前终端窗口大小
@@ -321,8 +355,7 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 				Session: sessionID,
 				UserID:  "client",
 			}
-			jsonData, _ := json.Marshal(resizeMsg)
-			if err := wsWriter.Write(jsonData); shouldLogWebSocketError(err) {
+			if err := relayClient.Send(resizeMsg); shouldLogRelaySendError(err) {
 				log.Printf("❌ 发送终端大小失败: %v", err)
 			}
 		}
@@ -368,36 +401,6 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 		}
 	}()
 
-	// WebSocket -> PTY (网页输入写入PTY)
-	// 使用单独的 goroutine 确保输入立即处理
-	go func() {
-		for {
-			_, message, err := conn.ReadMessage()
-			if err != nil {
-				if shouldLogWebSocketError(err) {
-					log.Printf("WebSocket读取失败: %v", err)
-				}
-				return
-			}
-
-			var msg TerminalMessage
-			if err := json.Unmarshal(message, &msg); err != nil {
-				continue
-			}
-
-			if msg.Type == "input" && msg.Data != "" {
-				// 立即写入PTY，不缓冲
-				if _, err := ptmx.Write([]byte(msg.Data)); err != nil {
-					log.Printf("PTY写入失败（Web输入）: %v", err)
-					continue
-				}
-			} else if msg.Type == "resize" {
-				// 处理窗口大小调整
-				// TODO: 实现PTY窗口大小调整
-			}
-		}
-	}()
-
 	// PTY -> 本地stdout + WebSocket (PTY输出同时显示在两端)
 	// 使用更小的缓冲区以减少延迟
 	buf := make([]byte, 1024)
@@ -430,8 +433,7 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 				UserID:  "client",
 			}
 
-			jsonData, _ := json.Marshal(msg)
-			if err := wsWriter.Write(jsonData); shouldLogWebSocketError(err) {
+			if err := relayClient.Send(msg); shouldLogRelaySendError(err) {
 				log.Printf("❌ 发送终端输出失败: %v", err)
 			}
 		}
