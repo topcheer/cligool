@@ -365,19 +365,6 @@ func runTerminalSession(serverURL, proxyURL, sessionID string, cols, rows int, c
 				log.Printf("PTY写入失败（本地输入）: %v", err)
 				continue
 			}
-
-			// 同时发送到WebSocket，让Web端看到本地输入
-			msg := TerminalMessage{
-				Type:    "input",
-				Data:    string(data),
-				Session: sessionID,
-				UserID:  "client",
-				Source:  "local",
-			}
-			jsonData, _ := json.Marshal(msg)
-			if err := wsWriter.Write(jsonData); shouldLogWebSocketError(err) {
-				log.Printf("❌ 发送本地输入失败: %v", err)
-			}
 		}
 	}()
 

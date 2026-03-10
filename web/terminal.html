@@ -1243,7 +1243,6 @@
         let ws = null;
         let clientOS = 'unknown';
         let hasReceivedFirstMessage = false;
-        let hasReceivedCachedMessages = false;
         let hasConnectedToLiveSession = false;
         let showingNoCliScreen = false;
         let reconnectAttempts = 0;
@@ -1484,10 +1483,6 @@
                     session: sessionId,
                     source: 'web'
                 });
-
-                if (clientOS === 'windows') {
-                    terminal.write(data);
-                }
             });
 
             terminal.onResize(() => {
@@ -1640,9 +1635,6 @@
                         terminal.reset();
                         showingNoCliScreen = false;
                     }
-                    if (!hasReceivedCachedMessages) {
-                        window.setTimeout(sendEnterKey, 350);
-                    }
                     break;
                 case 'output':
                     if (message.data) {
@@ -1652,13 +1644,6 @@
                             terminal.reset();
                             showingNoCliScreen = false;
                         }
-                        hasReceivedCachedMessages = true;
-                        terminal.write(message.data);
-                    }
-                    break;
-                case 'input':
-                    if (message.data && message.source === 'local') {
-                        markCliSessionAvailable();
                         terminal.write(message.data);
                     }
                     break;
@@ -1678,24 +1663,6 @@
                 default:
                     break;
             }
-        }
-
-        function sendEnterKey() {
-            if (!isSocketOpen()) {
-                return;
-            }
-
-            let enterKey = '\r';
-            if (clientOS === 'windows') {
-                enterKey = '\r\n';
-            }
-
-            sendJson({
-                type: 'input',
-                data: enterKey,
-                session: sessionId,
-                user_id: 'web'
-            });
         }
 
         function disconnect() {

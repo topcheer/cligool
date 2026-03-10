@@ -1,4 +1,4 @@
-.PHONY: all build clean test deps docker docker-build docker-up docker-down docker-logs help
+.PHONY: all build build-relay build-client build-all-platforms build-windows build-linux build-macos clean test deps docker docker-build docker-up docker-down docker-logs help
 
 # 默认目标
 all: build
@@ -33,14 +33,12 @@ build-client:
 # 构建跨平台版本
 build-all-platforms:
 	@echo "构建所有平台版本..."
-	@./build-windows.sh
+	@./build-all.sh
 
 # 构建Windows版本
 build-windows:
 	@echo "构建Windows版本..."
-	mkdir -p bin
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o bin/cligool.exe ./cmd/client
-	@echo "Windows版本构建完成: bin/cligool.exe"
+	@./build-windows.sh
 
 # 构建Linux版本
 build-linux:
@@ -130,7 +128,7 @@ help:
 	@echo "  make build-relay        - 构建中继服务器"
 	@echo "  make build-client       - 构建CLI客户端"
 	@echo "  make build-all-platforms - 构建所有平台版本"
-	@echo "  make build-windows      - 构建Windows版本"
+	@echo "  make build-windows      - 构建Windows版本 (amd64 + arm64)"
 	@echo "  make build-linux        - 构建Linux版本"
 	@echo "  make build-macos        - 构建macOS版本"
 	@echo "  make run-relay          - 运行中继服务器"

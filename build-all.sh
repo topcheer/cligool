@@ -1,133 +1,107 @@
 #!/bin/bash
-# 构建所有平台的客户端（29个平台）
+# 构建所有受支持平台的客户端 + relay
 
-set -e
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
 echo "🔨 开始构建所有平台的客户端..."
-echo "📊 目标平台：29个操作系统和架构组合"
+echo "📊 目标平台：29 个客户端平台 + 1 个中继服务器"
 echo ""
 
-# 创建输出目录
 mkdir -p bin
 
-# ==================== macOS 版本 ====================
-echo "📦 [1/33] 构建 macOS amd64..."
-GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -o bin/cligool-darwin-amd64 ./cmd/client
+CLIENT_TARGETS=(
+  "Windows amd64|windows|amd64|bin/cligool-windows-amd64.exe||"
+  "Windows arm64|windows|arm64|bin/cligool-windows-arm64.exe||"
+  "macOS amd64|darwin|amd64|bin/cligool-darwin-amd64||"
+  "macOS arm64|darwin|arm64|bin/cligool-darwin-arm64||"
+  "Linux amd64|linux|amd64|bin/cligool-linux-amd64||"
+  "Linux arm64|linux|arm64|bin/cligool-linux-arm64||"
+  "Linux 386|linux|386|bin/cligool-linux-386||"
+  "Linux arm|linux|arm|bin/cligool-linux-arm|GOARM|6"
+  "Linux armbe (ARM64 Big-Endian)|linux|arm64|bin/cligool-linux-armbe|GOARM|7"
+  "Linux ppc64le|linux|ppc64le|bin/cligool-linux-ppc64le||"
+  "Linux ppc64 (Big-Endian)|linux|ppc64|bin/cligool-linux-ppc64|GOBIGENDIAN|true"
+  "Linux riscv64|linux|riscv64|bin/cligool-linux-riscv64||"
+  "Linux s390x|linux|s390x|bin/cligool-linux-s390x||"
+  "Linux mips|linux|mips|bin/cligool-linux-mips||"
+  "Linux mips64le|linux|mips64le|bin/cligool-linux-mips64le||"
+  "Linux mips64|linux|mips64|bin/cligool-linux-mips64|GOMIPS|hardfloat"
+  "Linux loong64|linux|loong64|bin/cligool-linux-loong64||"
+  "FreeBSD amd64|freebsd|amd64|bin/cligool-freebsd-amd64||"
+  "FreeBSD arm64|freebsd|arm64|bin/cligool-freebsd-arm64||"
+  "FreeBSD 386|freebsd|386|bin/cligool-freebsd-386||"
+  "FreeBSD arm|freebsd|arm|bin/cligool-freebsd-arm|GOARM|6"
+  "FreeBSD riscv64|freebsd|riscv64|bin/cligool-freebsd-riscv64||"
+  "OpenBSD amd64|openbsd|amd64|bin/cligool-openbsd-amd64||"
+  "OpenBSD arm64|openbsd|arm64|bin/cligool-openbsd-arm64||"
+  "NetBSD amd64|netbsd|amd64|bin/cligool-netbsd-amd64||"
+  "NetBSD arm64|netbsd|arm64|bin/cligool-netbsd-arm64||"
+  "NetBSD arm|netbsd|arm|bin/cligool-netbsd-arm|GOARM|6"
+  "NetBSD 386|netbsd|386|bin/cligool-netbsd-386||"
+  "DragonFlyBSD amd64|dragonfly|amd64|bin/cligool-dragonfly-amd64||"
+)
 
-echo "📦 [2/33] 构建 macOS arm64..."
-GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -o bin/cligool-darwin-arm64 ./cmd/client
+TOTAL_STEPS=$((${#CLIENT_TARGETS[@]} + 1))
+STEP=1
+GENERATED_OUTPUTS=()
 
-# ==================== Linux 版本 ====================
-echo "📦 [3/33] 构建 Linux amd64..."
-GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bin/cligool-linux-amd64 ./cmd/client
+build_client_target() {
+  local label="$1"
+  local goos="$2"
+  local goarch="$3"
+  local output="$4"
+  local extra_key="$5"
+  local extra_value="$6"
 
-echo "📦 [4/33] 构建 Linux arm64..."
-GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o bin/cligool-linux-arm64 ./cmd/client
+  echo "📦 [${STEP}/${TOTAL_STEPS}] 构建 ${label}..."
+  if [[ -n "$extra_key" ]]; then
+    env CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" "${extra_key}=${extra_value}" \
+      go build -o "$output" ./cmd/client
+  else
+    env CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
+      go build -o "$output" ./cmd/client
+  fi
+  GENERATED_OUTPUTS+=("$output")
+  STEP=$((STEP + 1))
+}
 
-echo "📦 [5/33] 构建 Linux 386..."
-GOOS=linux GOARCH=386 CGO_ENABLED=0 go build -o bin/cligool-linux-386 ./cmd/client
+for target in "${CLIENT_TARGETS[@]}"; do
+  IFS='|' read -r label goos goarch output extra_key extra_value <<<"$target"
+  build_client_target "$label" "$goos" "$goarch" "$output" "$extra_key" "$extra_value"
+done
 
-echo "📦 [6/33] 构建 Linux arm..."
-GOOS=linux GOARCH=arm GOARM=6 CGO_ENABLED=0 go build -o bin/cligool-linux-arm ./cmd/client
-
-echo "📦 [7/33] 构建 Linux armbe (ARM64 Big-Endian)..."
-GOOS=linux GOARCH=arm64 GOARM=7 CGO_ENABLED=0 go build -o bin/cligool-linux-armbe ./cmd/client
-
-echo "📦 [8/33] 构建 Linux ppc64le..."
-GOOS=linux GOARCH=ppc64le CGO_ENABLED=0 go build -o bin/cligool-linux-ppc64le ./cmd/client
-
-echo "📦 [9/33] 构建 Linux ppc64 (Big-Endian)..."
-GOOS=linux GOARCH=ppc64 GOBIGENDIAN=true CGO_ENABLED=0 go build -o bin/cligool-linux-ppc64 ./cmd/client
-
-echo "📦 [10/33] 构建 Linux riscv64..."
-GOOS=linux GOARCH=riscv64 CGO_ENABLED=0 go build -o bin/cligool-linux-riscv64 ./cmd/client
-
-echo "📦 [11/33] 构建 Linux s390x..."
-GOOS=linux GOARCH=s390x CGO_ENABLED=0 go build -o bin/cligool-linux-s390x ./cmd/client
-
-echo "📦 [12/33] 构建 Linux mips..."
-GOOS=linux GOARCH=mips CGO_ENABLED=0 go build -o bin/cligool-linux-mips ./cmd/client
-
-echo "📦 [13/33] 构建 Linux mips64le..."
-GOOS=linux GOARCH=mips64le CGO_ENABLED=0 go build -o bin/cligool-linux-mips64le ./cmd/client
-
-echo "📦 [14/33] 构建 Linux mips64..."
-GOOS=linux GOARCH=mips64 GOMIPS=hardfloat CGO_ENABLED=0 go build -o bin/cligool-linux-mips64 ./cmd/client
-
-echo "📦 [15/33] 构建 Linux loong64..."
-GOOS=linux GOARCH=loong64 CGO_ENABLED=0 go build -o bin/cligool-linux-loong64 ./cmd/client
-
-# ==================== FreeBSD 版本 ====================
-echo "📦 [16/33] 构建 FreeBSD amd64..."
-GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build -o bin/cligool-freebsd-amd64 ./cmd/client
-
-echo "📦 [17/33] 构建 FreeBSD arm64..."
-GOOS=freebsd GOARCH=arm64 CGO_ENABLED=0 go build -o bin/cligool-freebsd-arm64 ./cmd/client
-
-echo "📦 [18/33] 构建 FreeBSD 386..."
-GOOS=freebsd GOARCH=386 CGO_ENABLED=0 go build -o bin/cligool-freebsd-386 ./cmd/client
-
-echo "📦 [19/33] 构建 FreeBSD arm..."
-GOOS=freebsd GOARCH=arm GOARM=6 CGO_ENABLED=0 go build -o bin/cligool-freebsd-arm ./cmd/client
-
-echo "📦 [20/33] 构建 FreeBSD riscv64..."
-GOOS=freebsd GOARCH=riscv64 CGO_ENABLED=0 go build -o bin/cligool-freebsd-riscv64 ./cmd/client
-
-# ==================== OpenBSD 版本 ====================
-echo "📦 [21/30] 构建 OpenBSD amd64..."
-GOOS=openbsd GOARCH=amd64 CGO_ENABLED=0 go build -o bin/cligool-openbsd-amd64 ./cmd/client
-
-echo "📦 [22/30] 构建 OpenBSD arm64..."
-GOOS=openbsd GOARCH=arm64 CGO_ENABLED=0 go build -o bin/cligool-openbsd-arm64 ./cmd/client
-
-# 注意：OpenBSD 386、arm和riscv64由于pty库限制已移除
-# pty库在OpenBSD非amd64/arm64架构上有已知限制
-
-# ==================== NetBSD 版本 ====================
-echo "📦 [23/30] 构建 NetBSD amd64..."
-GOOS=netbsd GOARCH=amd64 CGO_ENABLED=0 go build -o bin/cligool-netbsd-amd64 ./cmd/client
-
-echo "📦 [24/30] 构建 NetBSD arm64..."
-GOOS=netbsd GOARCH=arm64 CGO_ENABLED=0 go build -o bin/cligool-netbsd-arm64 ./cmd/client
-
-echo "📦 [25/30] 构建 NetBSD arm..."
-GOOS=netbsd GOARCH=arm GOARM=6 CGO_ENABLED=0 go build -o bin/cligool-netbsd-arm ./cmd/client
-
-echo "📦 [26/30] 构建 NetBSD 386..."
-GOOS=netbsd GOARCH=386 CGO_ENABLED=0 go build -o bin/cligool-netbsd-386 ./cmd/client
-
-# ==================== DragonFlyBSD 版本 ====================
-echo "📦 [27/29] 构建 DragonFlyBSD amd64..."
-GOOS=dragonfly GOARCH=amd64 CGO_ENABLED=0 go build -o bin/cligool-dragonfly-amd64 ./cmd/client
-
-# 注意：DragonFlyBSD arm64不被Go支持
-
-# ==================== Relay Server ====================
-echo "📦 [28/29] 构建中继服务器 (Linux amd64)..."
-GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bin/relay-server ./cmd/relay
+echo "📦 [${STEP}/${TOTAL_STEPS}] 构建中继服务器 (Linux amd64)..."
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/relay-server ./cmd/relay
+GENERATED_OUTPUTS+=("bin/relay-server")
 
 echo ""
 echo "✅ 构建完成！"
 echo ""
 echo "📊 构建统计："
-echo "   - macOS: 2个平台"
-echo "   - Linux: 13个平台"
-echo "   - FreeBSD: 5个平台"
-echo "   - OpenBSD: 2个平台 (仅amd64和arm64)"
-echo "   - NetBSD: 4个平台"
-echo "   - DragonFlyBSD: 1个平台 (仅amd64)"
-echo "   - 中继服务器: 1个"
-echo "   总计: 28个二进制文件"
+echo "   - Windows: 2 个平台"
+echo "   - macOS: 2 个平台"
+echo "   - Linux: 13 个平台"
+echo "   - FreeBSD: 5 个平台"
+echo "   - OpenBSD: 2 个平台 (仅 amd64 和 arm64)"
+echo "   - NetBSD: 4 个平台"
+echo "   - DragonFlyBSD: 1 个平台 (仅 amd64)"
+echo "   - 中继服务器: 1 个"
+echo "   总计: 30 个二进制文件"
 echo ""
 echo "⚠️  平台限制说明："
-echo "   - OpenBSD 386/arm/riscv64: pty库限制"
-echo "   - DragonFlyBSD arm64: Go不支持"
-echo "   - Windows: 需要在Windows系统或Docker中构建"
+echo "   - OpenBSD 386/arm/riscv64: pty 库限制"
+echo "   - DragonFlyBSD arm64: Go 不支持"
 echo ""
 echo "📦 构建的文件："
-ls -lh bin/
+for output in "${GENERATED_OUTPUTS[@]}"; do
+  ls -lh "$output"
+done
 echo ""
 echo "💡 提示："
-echo "   - Windows版本请在Docker容器中构建或使用GitHub Actions自动构建"
+echo "   - build-all.sh 会直接交叉编译 Windows / macOS / Linux / *BSD 版本"
+echo "   - 如只需 Windows 产物，可单独运行 ./build-windows.sh"
 echo "   - 所有二进制文件都是静态编译，无需额外依赖"
 echo "   - 可以直接复制到目标系统运行"

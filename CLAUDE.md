@@ -46,11 +46,14 @@ CLI客户端 ──WebSocket──> 中继服务器 <──WebSocket─── We
 ### 构建命令
 
 ```bash
-# Docker构建（包含所有30个平台客户端）
+# Docker构建（包含全部客户端下载产物）
 docker-compose build relay-server
 
-# 本地构建所有*nix平台客户端（29个，含Windows）
+# 本地构建所有客户端平台 + relay（含 Windows amd64/arm64）
 ./build-all.sh
+
+# 仅构建 Windows 客户端（amd64 + arm64）
+./build-windows.sh
 
 # 本地构建特定平台
 GOOS=linux GOARCH=amd64 go build -o bin/cligool-linux-amd64 ./cmd/client
@@ -67,8 +70,8 @@ docker-compose ps
 ```
 
 **重要提示**：
-- Windows客户端必须在Docker容器中构建（或使用交叉编译）
-- 本地macOS/Linux可以使用`./build-all.sh`构建所有*nix平台
+- 本地 macOS/Linux 可以直接使用 `./build-all.sh` 交叉编译所有受支持客户端平台
+- 如只需 Windows 产物，可使用 `./build-windows.sh`
 - Docker构建会将所有客户端打包到`web/downloads/`目录
 - Windows客户端会自动压缩为.zip文件以减少下载大小
 
@@ -163,19 +166,17 @@ Web端user_id使用时间戳确保每次连接唯一。
 
 2. **WebSocket连接**：user_id参数使用`Date.now()`确保唯一性
 
-### Web端本地回显逻辑
+### Web端输入回显逻辑
 
-**关键**：Web端需要根据客户端操作系统类型决定是否本地回显：
+**关键**：Web端**不应该**本地回显用户输入，应该始终等待真实 PTY/ConPTY 的输出：
 
-- **Windows（cmd.exe管道模式）**：
-  - 管道不会自动回显输入
-  - Web端需要立即本地回显用户输入
-  - 避免输入"消失"的体验问题
+- **Windows（ConPTY）**：
+  - ConPTY会输出真实的终端回显
+  - Web端如果立即本地回显，会出现重复输入
 
 - **Unix（PTY模式）**：
   - PTY会自动回显所有输入
-  - Web端**不应该**本地回显（避免重复）
-  - 等待PTY的输出消息
+  - Web端同样不应该本地回显
 
 实现位置：`web/terminal.html`中的`terminal.onData`处理器：
 ```javascript
@@ -187,13 +188,6 @@ terminal.onData(data => {
             session: sessionId,
             source: 'web'
         }));
-
-        // 根据客户端操作系统类型决定是否本地回显
-        if (clientOS === 'windows') {
-            // Windows: 立即本地回显
-            terminal.write(data);
-        }
-        // Unix: 不本地回显，等待PTY回显
     }
 });
 ```
